@@ -6,9 +6,16 @@ import { makeSave, loadSave, DEFAULT_SETTINGS, DEFAULT_CREATURE } from "../src/s
 import type { Genome } from "../src/sim/types";
 
 function signature(w: World): string {
-  // A compact deterministic fingerprint of world state.
-  let s = `${w.tick}|${w.nextId}|${w.organisms.length}|`;
-  for (const o of w.organisms) {
+  // A compact deterministic fingerprint of world state. Must filter to
+  // `alive` organisms: World.organisms lazily compacts dead entries (only
+  // every 30 ticks, see World.step/compact), so the raw array can briefly
+  // contain organisms that already died. World.snapshot() (used by
+  // save/load) correctly excludes them, so this helper has to match that or
+  // a save/load round trip taken between compactions looks like a mismatch
+  // when it isn't one.
+  const alive = w.organisms.filter((o) => o.alive);
+  let s = `${w.tick}|${w.nextId}|${alive.length}|`;
+  for (const o of alive) {
     s += `${o.id}:${o.pos.x.toFixed(4)},${o.pos.y.toFixed(4)},${o.energy.toFixed(4)};`;
   }
   return s;

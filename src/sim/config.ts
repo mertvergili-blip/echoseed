@@ -54,6 +54,7 @@ export const CONFIG = {
   historyInterval: 60,
   maxHistorySamples: 600,
   memoryDecayTicks: 240,
+  threatMemoryTicks: 150, // base window for residual fear after losing sight of a threat
 
   // Ascension thresholds
   ascendMinGeneration: 4,

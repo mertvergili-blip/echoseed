@@ -264,7 +264,12 @@ export class World {
 
   private updateEnvironment(): void {
     const e = this.env;
-    e.timeOfDay = (this.tick % e.dayLength) / e.dayLength;
+    // Phase-shifted so a fresh world (tick 0) opens in daylight rather than
+    // at midnight — without this, every new simulation's first ~500 ticks
+    // were "night", and most organisms would immediately go idle/asleep
+    // before the player had seen anything move.
+    const dayOffset = e.dayLength * 0.4;
+    e.timeOfDay = ((this.tick + dayOffset) % e.dayLength) / e.dayLength;
 
     // Diurnal temperature: warm at noon, cold at night, around baseline.
     const diurnal = Math.sin((e.timeOfDay - 0.25) * Math.PI * 2) * 0.18;
@@ -449,13 +454,11 @@ export class World {
     const g = o.genome;
     const energyFrac = o.energy / o.maxEnergy;
 
-    // Sleep pressure at night.
-    if (isNight && this.rng.next() < g.sleepTendency * 0.02 + (energyFrac > 0.4 ? 0.01 : 0)) {
-      // no-op; handled by scores below
-    }
-
     const scores: Record<Action, number> = {
-      wander: 0.15 + g.curiosity * 0.1,
+      // Curiosity's behavioural expression lives in `investigate`, not here —
+      // giving wander its own curiosity bonus would let it outbid investigate
+      // at every curiosity level and make the trait invisible in practice.
+      wander: 0.15,
       seekFood: 0,
       seekWater: 0,
       flee: 0,
@@ -473,6 +476,17 @@ export class World {
       scores.flee = (0.5 + g.fear) * (0.4 + proximity);
       o.memory.lastThreatPos = { ...p.nearestThreat.pos };
       o.memory.lastThreatTick = this.tick;
+    } else if (o.memory.lastThreatPos) {
+      // Residual fear: after a threat leaves vision, fearful organisms keep
+      // some flee urgency toward its last known position for a while longer
+      // than bold ones do. Without this, fear only matters in the narrow
+      // instant before a threat crosses the hard vision-radius cutoff, which
+      // makes the trait nearly invisible in practice.
+      const age = this.tick - o.memory.lastThreatTick;
+      const window = CONFIG.threatMemoryTicks * (0.2 + g.fear);
+      if (age < window) {
+        scores.flee = g.fear * 0.55 * (1 - age / window);
+      }
     }
 
     // Hunger.
@@ -510,7 +524,7 @@ export class World {
 
     // Investigate novelty when curious and otherwise idle.
     if (o.memory.lastFoodPos && this.tick - o.memory.lastFoodTick < CONFIG.memoryDecayTicks) {
-      scores.investigate = g.curiosity * 0.2;
+      scores.investigate = g.curiosity * 0.35;
     }
 
     // Pick highest.
@@ -538,7 +552,10 @@ export class World {
         if (from) {
           const dx = o.pos.x - from.x;
           const dy = o.pos.y - from.y;
-          this.steer(o, dx, dy, speed * CONFIG.fleeMultiplier);
+          // Fearful organisms sprint harder; bold ones flee at a more measured
+          // pace (and pay less of an energy cost for it — see integrate()).
+          const urgency = 0.6 + g.fear * 0.8;
+          this.steer(o, dx, dy, speed * CONFIG.fleeMultiplier * urgency);
         }
         break;
       }
@@ -557,7 +574,11 @@ export class World {
         break;
       }
       case "chase": {
-        if (p.nearestPrey) this.seek(o, p.nearestPrey.pos, speed * 1.1);
+        // Aggression scales pursuit speed, not just the decision to chase —
+        // otherwise it only shifts a scoring threshold that's rarely binding
+        // (chase tends to beat wander for any aggression once prey is
+        // visible), leaving the trait with no real physical effect.
+        if (p.nearestPrey) this.seek(o, p.nearestPrey.pos, speed * (0.85 + g.aggression * 0.5));
         break;
       }
       case "attack": {
@@ -592,22 +613,30 @@ export class World {
       }
       case "wander":
       default: {
-        // Random-walk steering biased by current heading.
-        const jitter = CONFIG.wanderJitter;
-        o.vel.x += this.rng.range(-jitter, jitter);
-        o.vel.y += this.rng.range(-jitter, jitter);
-
-        // Flocking cohesion: sociable organisms drift toward same-species
-        // center of mass. This makes `sociability` a measurable behaviour and
-        // raises mating-encounter rates so prey can sustain a breeding base.
+        // Flocking cohesion: sociable organisms steer toward the same-species
+        // center of mass, same mechanism `seek` uses for food/mates (not a
+        // weak positional nudge, which gets lost in wander jitter). This
+        // makes `sociability` a measurable behaviour and raises
+        // mating-encounter rates so prey can sustain a breeding base.
+        let cohesionWeight = 0;
         if (p.cohesion) {
           const energyFrac = o.energy / o.maxEnergy;
           // Reproductively-ready organisms seek company harder (to find a mate).
           const ready = energyFrac >= CONFIG.reproMinEnergyFrac && o.reproCooldown <= 0;
-          const pull = (0.1 + g.sociability * 0.5 + (ready ? 0.5 : 0)) * CONFIG.cohesionStrength;
-          o.vel.x += (p.cohesion.x - o.pos.x) * pull;
-          o.vel.y += (p.cohesion.y - o.pos.y) * pull;
+          cohesionWeight = Math.min(0.9, g.sociability * 0.7 + (ready ? 0.3 : 0));
+          const dx = p.cohesion.x - o.pos.x;
+          const dy = p.cohesion.y - o.pos.y;
+          const d = Math.hypot(dx, dy);
+          if (cohesionWeight > 0.05 && d > 20) {
+            this.steer(o, dx, dy, speed * 0.7 * cohesionWeight);
+          }
         }
+
+        // Random-walk jitter fills in the rest, scaled down for organisms
+        // strongly committed to flocking so cohesion isn't drowned out.
+        const jitter = CONFIG.wanderJitter * (1 - cohesionWeight * 0.6);
+        o.vel.x += this.rng.range(-jitter, jitter);
+        o.vel.y += this.rng.range(-jitter, jitter);
 
         const sp = Math.hypot(o.vel.x, o.vel.y) || 1;
         const cap = speed * 0.6;
