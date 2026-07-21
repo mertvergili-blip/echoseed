@@ -85,6 +85,7 @@ export type InterventionType =
   | "addFood"
   | "rain"
   | "drought"
+  | "cold"
   | "setTemperature"
   | "addHerbivore"
   | "addPredator"
