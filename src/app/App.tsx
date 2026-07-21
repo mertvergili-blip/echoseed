@@ -178,13 +178,45 @@ export function App() {
     if (!ready) return;
     const t = setInterval(doSave, 15000);
     const onUnload = () => {
-      // Best-effort synchronous-ish save.
+      // Best-effort — see the Tauri close-requested handler below for the
+      // guaranteed path when running as the desktop app.
       void doSave();
     };
     window.addEventListener("beforeunload", onUnload);
     return () => {
       clearInterval(t);
       window.removeEventListener("beforeunload", onUnload);
+    };
+  }, [ready, doSave]);
+
+  // Guaranteed save-before-close (Tauri only). doSave() round-trips a
+  // snapshot request to the simulation Web Worker before writing to disk —
+  // meaningfully more likely to still be in flight when the window closes
+  // than a simple synchronous write, so beforeunload alone isn't reliable
+  // here. Intercepting close-requested lets the save finish before the
+  // window (and worker) actually tear down.
+  useEffect(() => {
+    if (!ready || !isTauriRuntime()) return;
+    let unlisten: (() => void) | null = null;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { getCurrentWindow } = await import("@tauri-apps/api/window");
+        const win = getCurrentWindow();
+        const off = await win.onCloseRequested(async (event) => {
+          event.preventDefault();
+          await doSave();
+          await win.destroy();
+        });
+        if (cancelled) off();
+        else unlisten = off;
+      } catch {
+        /* ignore — falls back to beforeunload's best-effort save */
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (unlisten) unlisten();
     };
   }, [ready, doSave]);
 

@@ -8,7 +8,21 @@ export function isTauriRuntime(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
+// Guards against a duplicate window from a rapid double-click: `getAllWebviewWindows()`
+// is async, so two near-simultaneous calls could both observe "no creature
+// window yet" and both proceed to construct one. Concurrent callers instead
+// await the same in-flight open attempt.
+let inFlightOpen: Promise<boolean> | null = null;
+
 export async function openCreatureWindow(): Promise<boolean> {
+  if (inFlightOpen) return inFlightOpen;
+  inFlightOpen = doOpenCreatureWindow().finally(() => {
+    inFlightOpen = null;
+  });
+  return inFlightOpen;
+}
+
+async function doOpenCreatureWindow(): Promise<boolean> {
   if (isTauriRuntime()) {
     try {
       const { WebviewWindow, getAllWebviewWindows } = await import(
@@ -43,13 +57,17 @@ export async function openCreatureWindow(): Promise<boolean> {
     }
   }
 
-  // Browser fallback: popup window loading the creature view.
+  // Browser fallback: popup window loading the creature view. Reusing the
+  // same window name ("echoseed-creature") makes a second call to
+  // window.open() focus the existing popup instead of creating a new one,
+  // which is the browser-side equivalent of the Tauri label-reuse above.
   try {
     const popup = window.open(
       "creature.html",
       "echoseed-creature",
       "width=220,height=220,menubar=no,toolbar=no,location=no,status=no",
     );
+    popup?.focus();
     return !!popup;
   } catch {
     return false;

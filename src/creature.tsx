@@ -6,6 +6,7 @@ import { randomGenome } from "./sim/genome";
 import { Rng } from "./sim/rng";
 import { CreatureEngine } from "./creature/creatureEngine";
 import { CreatureRenderer } from "./creature/creatureRender";
+import { clampToMonitor, clampMenuPosition, offlineCatchupSeconds } from "./creature/windowMath";
 import type { Genome } from "./sim/types";
 import { isTauriRuntime } from "./platform/creatureWindow";
 import "./styles.css";
@@ -22,9 +23,12 @@ function CreatureApp() {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [status, setStatus] = useState("");
   const [loaded, setLoaded] = useState(false);
-  const draggingWindow = useRef(false);
+  // While true, the click-through hit-test loop is suppressed so the window
+  // never starts ignoring cursor events mid-drag or while the context menu
+  // (a real interactive overlay) is open.
+  const suppressPassthrough = useRef(false);
 
-  // Boot: load save, resolve ascended genome, start loop.
+  // Boot: load save, resolve ascended genome, catch up on offline time, start loop.
   useEffect(() => {
     let raf = 0;
     let disposed = false;
@@ -33,6 +37,7 @@ function CreatureApp() {
       const outcome = await storage.load();
       let genome: Genome;
       let cstate: CreatureState;
+      let offlineSeconds = 0;
       if (outcome.status !== "empty") {
         // loadSave safely falls back to a fresh world on "corrupt" data too
         // (same guarantee the terrarium window relies on) — the corrupt case
@@ -47,6 +52,9 @@ function CreatureApp() {
           w.organisms.find((o) => o.alive && o.species !== "plant") ??
           null;
         genome = chosen ? chosen.genome : resolveAscended().genome;
+        if (res.savedAt != null) {
+          offlineSeconds = offlineCatchupSeconds(res.savedAt, Date.now());
+        }
       } else {
         const fallback = resolveAscended();
         genome = fallback.genome;
@@ -56,6 +64,13 @@ function CreatureApp() {
       if (disposed) return;
       const engine = new CreatureEngine(genome, cstate);
       engineRef.current = engine;
+      if (offlineSeconds > 0) {
+        // Catch the creature's needs up on real time elapsed while its
+        // window was closed, in one step, rather than leaving hunger/energy
+        // exactly as they were the instant the app last saved — a creature
+        // closed for hours should visibly be hungrier when you reopen it.
+        engine.update(offlineSeconds);
+      }
       if (canvasRef.current) {
         rendererRef.current = new CreatureRenderer(canvasRef.current);
       }
@@ -78,7 +93,10 @@ function CreatureApp() {
     const onResize = () => rendererRef.current?.resize();
     window.addEventListener("resize", onResize);
 
-    // Persist creature state periodically & on unload.
+    // Persist creature state periodically & on unload. beforeunload is
+    // best-effort (see the Tauri close-requested handler below for the
+    // guaranteed path); it still helps for the browser fallback build,
+    // where there is no close-requested equivalent.
     const saveState = async () => {
       const engine = engineRef.current;
       if (!engine) return;
@@ -97,6 +115,36 @@ function CreatureApp() {
     };
   }, []);
 
+  // Guaranteed save-before-close (Tauri only): beforeunload is best-effort
+  // and can't reliably await async Tauri Store I/O before the native window
+  // actually tears down. Intercepting close-requested lets us finish the
+  // save first, then close explicitly.
+  useEffect(() => {
+    if (!isTauriRuntime()) return;
+    let unlisten: (() => void) | null = null;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { getCurrentWindow } = await import("@tauri-apps/api/window");
+        const win = getCurrentWindow();
+        const off = await win.onCloseRequested(async (event) => {
+          event.preventDefault();
+          const engine = engineRef.current;
+          if (engine) await mergeCreatureState(engine.state);
+          await win.destroy();
+        });
+        if (cancelled) off();
+        else unlisten = off;
+      } catch {
+        /* ignore — falls back to beforeunload's best-effort save */
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (unlisten) unlisten();
+    };
+  }, []);
+
   // Autonomous window drift across the screen (Tauri only).
   useEffect(() => {
     if (!isTauriRuntime()) return;
@@ -108,23 +156,36 @@ function CreatureApp() {
       const engine = engineRef.current;
       try {
         if (engine && (engine.activity === "wander" || engine.activity === "play")) {
-          const { getCurrentWindow, LogicalPosition } = await import("@tauri-apps/api/window");
-          const { currentMonitor } = await import("@tauri-apps/api/window");
+          const { getCurrentWindow, LogicalPosition, currentMonitor } = await import(
+            "@tauri-apps/api/window"
+          );
           const win = getCurrentWindow();
           const mon = await currentMonitor();
           const pos = await win.outerPosition();
           const size = await win.outerSize();
           const scale = mon?.scaleFactor ?? 1;
-          const sw = (mon?.size.width ?? 1920) / scale;
-          const sh = (mon?.size.height ?? 1080) / scale;
           const ww = size.width / scale;
           const wh = size.height / scale;
           const curX = pos.x / scale;
           const curY = pos.y / scale;
-          // Nudge toward a random nearby point, staying on-screen.
-          const nx = Math.max(0, Math.min(sw - ww, curX + (Math.random() - 0.5) * 260));
-          const ny = Math.max(0, Math.min(sh - wh, curY + (Math.random() - 0.5) * 180));
-          await win.setPosition(new LogicalPosition(nx, ny));
+          const desired = {
+            x: curX + (Math.random() - 0.5) * 260,
+            y: curY + (Math.random() - 0.5) * 180,
+          };
+          // Monitor bounds are in *global* virtual-desktop coordinates, not
+          // relative to the monitor itself — clampToMonitor accounts for
+          // monitor.position so this stays correct on multi-monitor setups
+          // where the current monitor isn't the one at the global origin.
+          const monitorBounds = mon
+            ? {
+                x: mon.position.x / scale,
+                y: mon.position.y / scale,
+                w: mon.size.width / scale,
+                h: mon.size.height / scale,
+              }
+            : { x: 0, y: 0, w: 1920, h: 1080 };
+          const clamped = clampToMonitor(monitorBounds, { w: ww, h: wh }, desired);
+          await win.setPosition(new LogicalPosition(clamped.x, clamped.y));
         }
       } catch {
         /* ignore movement errors */
@@ -138,17 +199,88 @@ function CreatureApp() {
     };
   }, []);
 
+  // Click-through for transparent areas (Tauri only): poll the global cursor
+  // position (a real OS-level query, unaffected by whether this window is
+  // currently receiving pointer events) and sample the rendered canvas's
+  // alpha channel underneath it. Empty/transparent space toggles
+  // setIgnoreCursorEvents(true) so a click there passes through to whatever
+  // is behind the window instead of the window swallowing it; opaque
+  // (creature body) pixels keep the window interactive.
+  //
+  // Honest limitation: this is polling-based (checked a few times a second),
+  // not true OS-level per-pixel hit-testing, so there is a small window
+  // (well under the polling interval) where a very fast mouse movement could
+  // see a one-frame-stale passthrough state. It also only runs while the
+  // window isn't being dragged or showing the context menu, both of which
+  // force cursor events back on so those interactions are never swallowed.
+  useEffect(() => {
+    if (!isTauriRuntime()) return;
+    let cancelled = false;
+    let lastIgnoring: boolean | null = null;
+    const POLL_MS = 90;
+
+    const tick = async () => {
+      if (cancelled) return;
+      try {
+        if (!suppressPassthrough.current) {
+          const { getCurrentWindow, cursorPosition } = await import("@tauri-apps/api/window");
+          const win = getCurrentWindow();
+          const [cursor, winPos, scale] = await Promise.all([
+            cursorPosition(),
+            win.outerPosition(),
+            win.scaleFactor(),
+          ]);
+          const localX = (cursor.x - winPos.x) / scale;
+          const localY = (cursor.y - winPos.y) / scale;
+          const canvas = canvasRef.current;
+          let shouldIgnore = true;
+          if (canvas && localX >= 0 && localY >= 0 && localX < canvas.clientWidth && localY < canvas.clientHeight) {
+            const ctx = canvas.getContext("2d");
+            if (ctx) {
+              const dpr = window.devicePixelRatio || 1;
+              const px = Math.min(canvas.width - 1, Math.max(0, Math.round(localX * dpr)));
+              const py = Math.min(canvas.height - 1, Math.max(0, Math.round(localY * dpr)));
+              const alpha = ctx.getImageData(px, py, 1, 1).data[3];
+              shouldIgnore = alpha < 12; // near-fully-transparent pixel
+            } else {
+              shouldIgnore = false; // can't sample — safer to stay interactive
+            }
+          }
+          if (shouldIgnore !== lastIgnoring) {
+            lastIgnoring = shouldIgnore;
+            await win.setIgnoreCursorEvents(shouldIgnore);
+          }
+        } else if (lastIgnoring !== false) {
+          // Dragging or menu open: force interactive regardless of pixel state.
+          const { getCurrentWindow } = await import("@tauri-apps/api/window");
+          lastIgnoring = false;
+          await getCurrentWindow().setIgnoreCursorEvents(false);
+        }
+      } catch {
+        /* ignore — worst case the window stays fully interactive */
+      }
+      setTimeout(tick, POLL_MS);
+    };
+    const handle = setTimeout(tick, POLL_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, []);
+
   // Dragging: in Tauri, drag the OS window; in browser, move creature in-canvas.
   const onPointerDown = async (e: React.PointerEvent) => {
     if (e.button !== 0) return;
     setMenu(null);
     if (isTauriRuntime()) {
       try {
+        suppressPassthrough.current = true;
         const { getCurrentWindow } = await import("@tauri-apps/api/window");
-        draggingWindow.current = true;
         await getCurrentWindow().startDragging();
       } catch {
         /* ignore */
+      } finally {
+        suppressPassthrough.current = false;
       }
     } else {
       // Browser: move creature toward pointer while held.
@@ -172,12 +304,25 @@ function CreatureApp() {
 
   const onContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
-    setMenu({ x: e.clientX, y: e.clientY });
+    suppressPassthrough.current = true;
+    // Clamp so the menu never extends past the (small) window's edge, where
+    // `overflow: hidden` would otherwise clip it and make items unreachable.
+    const clamped = clampMenuPosition(
+      { x: e.clientX, y: e.clientY },
+      { w: 160, h: 190 },
+      { w: window.innerWidth, h: window.innerHeight },
+    );
+    setMenu(clamped);
+  };
+
+  const closeMenu = () => {
+    setMenu(null);
+    suppressPassthrough.current = false;
   };
 
   const act = async (action: string) => {
     const engine = engineRef.current;
-    setMenu(null);
+    closeMenu();
     if (!engine) return;
     switch (action) {
       case "feed":
@@ -209,7 +354,18 @@ function CreatureApp() {
       <canvas ref={canvasRef} />
       <div className="creature-status">{loaded ? status : "waking…"}</div>
       {menu && (
-        <div className="creature-menu" style={{ left: menu.x, top: menu.y }}>
+        // stopPropagation on pointerdown: without it, pressing a menu button
+        // bubbles up to the stage's onPointerDown and calls startDragging(),
+        // which (on at least Windows/WebView2) can swallow the click the OS
+        // drag operation was started from, so the button's onClick never
+        // fires. The menu is only ever opened by an explicit right-click, so
+        // there's no legitimate case where a press inside it should also
+        // start dragging the window.
+        <div
+          className="creature-menu"
+          style={{ left: menu.x, top: menu.y }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
           <button onClick={() => act("feed")}>🍃 Feed</button>
           <button onClick={() => act("pet")}>✧ Pet</button>
           <button onClick={() => act("sleep")}>☾ Sleep</button>

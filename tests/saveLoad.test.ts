@@ -144,6 +144,33 @@ describe("save/load: old schema version", () => {
   });
 });
 
+describe("save/load: savedAt timestamp", () => {
+  it("round-trips the save timestamp for offline-progress calculations", () => {
+    const w = new World("savedat-save");
+    for (let i = 0; i < 20; i++) w.step();
+    const save = makeSave(w, DEFAULT_SETTINGS, DEFAULT_CREATURE);
+    const json = JSON.parse(JSON.stringify(save));
+    const result = loadSave(json);
+    expect(result.savedAt).toBe(save.savedAt);
+    expect(typeof result.savedAt).toBe("number");
+  });
+
+  it("reports savedAt as null when falling back to a fresh world", () => {
+    const r = loadSave(null);
+    expect(r.recovered).toBe(true);
+    expect(r.savedAt).toBeNull();
+  });
+
+  it("ignores a malformed savedAt field rather than propagating garbage", () => {
+    const w = new World("savedat-bad");
+    const save = makeSave(w, DEFAULT_SETTINGS, DEFAULT_CREATURE);
+    const json: any = JSON.parse(JSON.stringify(save));
+    json.savedAt = "not-a-timestamp";
+    const result = loadSave(json);
+    expect(result.savedAt).toBeNull();
+  });
+});
+
 describe("save/load: missing fields", () => {
   it("falls back safely when top-level fields are absent", () => {
     const casesThatMustFallBack = [

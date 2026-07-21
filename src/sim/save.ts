@@ -68,6 +68,11 @@ export interface LoadResult {
   creature: CreatureState;
   recovered: boolean; // true if we fell back due to corruption / version drift
   reason?: string;
+  /** When this save was written (Date.now() at save time), or null for a
+   * fresh/fallback world with no prior save to date. Callers use this to
+   * catch up on elapsed real time — e.g. the desktop creature getting
+   * hungrier while its window was closed. */
+  savedAt: number | null;
 }
 
 /**
@@ -83,6 +88,7 @@ export function loadSave(raw: unknown): LoadResult {
     creature: { ...DEFAULT_CREATURE },
     recovered: true,
     reason,
+    savedAt: null,
   });
 
   try {
@@ -124,8 +130,10 @@ export function loadSave(raw: unknown): LoadResult {
 
     const settings = sanitizeSettings(migrated.settings);
     const creature = sanitizeCreature(migrated.creature);
+    const savedAt =
+      typeof data.savedAt === "number" && Number.isFinite(data.savedAt) ? data.savedAt : null;
 
-    return { ok: true, world, settings, creature, recovered: false };
+    return { ok: true, world, settings, creature, recovered: false, savedAt };
   } catch (e) {
     return fallback("exception: " + (e as Error).message);
   }
