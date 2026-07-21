@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { World } from "../src/sim/world";
 import { Rng } from "../src/sim/rng";
 import { randomGenome } from "../src/sim/genome";
-import type { Genome, Species } from "../src/sim/types";
+import type { Genome } from "../src/sim/types";
 
 /**
  * Natural-selection controlled experiments. Each test drops two cohorts with
