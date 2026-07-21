@@ -85,6 +85,13 @@ src-tauri/target/release/bundle/nsis/ECHOSEED_0.1.0_x64-setup.exe
 > build on Windows for the `.msi` / `.exe`. The bundle targets are already
 > configured in `src-tauri/tauri.conf.json`.
 
+A GitHub Actions workflow (`.github/workflows/windows-build.yml`) builds this
+on a real `windows-latest` runner on every push/PR touching the app or `src-tauri/`,
+and can also be triggered manually. It has been run end-to-end at least once
+and produced a working `.msi`, NSIS `.exe`, and standalone `echoseed.exe` as
+downloadable workflow artifacts — this isn't just a theoretical config, it has
+verifiably built a Windows installer from this repository.
+
 ---
 
 ## Controls
@@ -139,12 +146,17 @@ src/
   sim/         deterministic engine (rng, genome, spatial hash, world, save, types, protocol)
   worker/      sim.worker.ts — runs the World off the main thread
   render/      renderer.ts — PixiJS procedural terrarium renderer
-  app/         React terrarium UI (App, SimClient, components)
-  creature/    desktop-creature engine + canvas renderer
+  app/         React terrarium UI (App, ErrorBoundary, SimClient, components)
+  creature/    desktop-creature engine, canvas renderer, window/monitor math (windowMath.ts)
   platform/    storage adapter (Tauri Store ↔ localStorage) + creature window
   main.tsx     terrarium entry     creature.tsx  creature-window entry
-src-tauri/     Rust backend (minimal: store plugin, uptime, window setup) + config + capabilities
-tests/         Vitest suites (engine, creature, long-run soak)
+src-tauri/     Rust backend (store plugin, uptime, window setup, unit tests) + config + capabilities
+scripts/       analyze.ts — permanent multi-seed simulation analysis tool
+tests/         Vitest suites (engine, genome behavior, natural selection, save/load,
+               storage, window math, creature, long-run soak)
+tests/e2e/     Playwright suite against the real running app (terrarium, desktop
+               creature window, accessibility)
+.github/workflows/  windows-build.yml — Windows CI build/bundle
 ```
 
 ## Privacy
@@ -153,6 +165,18 @@ ECHOSEED reads **no** global keyboard input, **no** typed text, takes **no**
 screenshots, and collects **no** browser history. The only signals used are
 in-app interactions, the local clock, the current simulation state, and how long
 the app has been open.
+
+## Accessibility & robustness
+
+- Keyboard focus is visible on every interactive control (`:focus-visible`
+  outline), and `prefers-reduced-motion` dampens the terrarium's decorative
+  glow-pulse/sway/shimmer animation to near-zero amplitude.
+- A React error boundary wraps both the terrarium and creature windows: an
+  unexpected render crash shows a dark-themed fallback with a reload button
+  instead of a blank white screen.
+- Corrupted, truncated, or schema-invalid saves are detected explicitly (not
+  conflated with "no save yet") and repaired field-by-field where possible,
+  with a toast telling the player what happened — see "Save integrity" below.
 
 ## Save integrity
 
@@ -163,15 +187,37 @@ data, loading falls back safely to a fresh world instead of crashing — see the
 ## Testing
 
 ```bash
-pnpm test         # full suite (engine + creature + soak)
+pnpm test         # full Vitest suite (engine, genome behavior, natural selection,
+                   # save/load, storage, window math, creature, soak)
 pnpm test:soak    # 20,000-tick headless soak run only
 pnpm test:watch   # watch mode
+pnpm test:e2e     # Playwright suite against the real running app
+pnpm typecheck    # tsc --noEmit
+pnpm lint         # ESLint, zero warnings allowed
+pnpm analyze      # headless multi-seed simulation analysis (pnpm analyze [seeds] [ticks])
 ```
 
-Covered: deterministic seed, genome inheritance, mutation bounds, energy
-consumption, feeding, reproduction, death, predator targeting, save/load round
-trip, corrupted-save fallback, no-NaN invariants, creature needs bounds, and a
-long-running soak test.
+**Vitest** (unit/integration, runs the simulation directly, no browser) covers:
+deterministic replay — including a byte-identical full-state check at multiple
+tick checkpoints, not just aggregate stats — genome inheritance, mutation
+bounds, per-trait behavioral effects (fear/aggression/curiosity/sociability
+measurably change what an organism does), controlled natural-selection
+experiments (predation, cold, heat, drought/scarcity, predator-free) proving
+advantageous traits actually win head-to-head survival contests rather than
+just "look different," population-balance stability across many seeds,
+save/load round-tripping including partial corruption repair, the
+empty/corrupt/ok storage-layer distinction, creature needs bounds, desktop
+creature window/monitor math, and a long-running soak test.
+
+**Playwright** (`tests/e2e/`, real browser against the running app) covers:
+boot into a live simulation, pause/resume, all speed multipliers, every
+weather/temperature intervention, add-food/herbivore/predator, organism
+selection and the inspector's genome display, ascend, camera follow, save,
+reset, corrupted/invalid-save recovery, the desktop creature popup window and
+its context menu actions, keyboard focus visibility, and `prefers-reduced-motion`.
+Every test fails on any console error, unhandled page error, or failed network
+request — not just on the specific assertion it's checking — via a shared
+`trackedPage` fixture (see `tests/e2e/helpers.ts`).
 
 ---
 
