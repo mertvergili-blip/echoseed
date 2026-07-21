@@ -1,0 +1,143 @@
+name: Windows Build
+
+# Builds and verifies the ECHOSEED desktop app on Windows: frontend tests,
+# typecheck, production frontend build, `cargo check`, then the full Tauri
+# release build (MSI + NSIS installers), uploaded as workflow artifacts.
+#
+# This does not build the browser/dev bundle — that's covered implicitly by
+# `pnpm build` here and by the cross-platform test job. Its sole purpose is
+# verifying the Windows desktop build end to end, since that can only be
+# done on an actual Windows runner (Tauri does not support cross-compiling a
+# Windows installer from Linux/macOS).
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "src-tauri/**"
+      - "tests/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "vite.config.ts"
+      - "tsconfig.json"
+      - ".github/workflows/windows-build.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "src-tauri/**"
+      - "tests/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "vite.config.ts"
+      - "tsconfig.json"
+      - ".github/workflows/windows-build.yml"
+
+concurrency:
+  group: windows-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      # WebView2 note: GitHub-hosted windows-latest runners ship with the
+      # WebView2 Runtime preinstalled (it's bundled with Windows 11 / kept
+      # current via Edge updates on the runner image), which is what the
+      # built app needs at *run* time. At *build* time, the webview2-com
+      # crate (a transitive dependency of tauri-runtime-wry on Windows)
+      # fetches the WebView2 SDK itself via its build script — no manual
+      # SDK install step is required here. If a future runner image ever
+      # drops the preinstalled runtime, end users still get it automatically
+      # since Tauri's NSIS/MSI bundlers include a WebView2 bootstrapper by
+      # default.
+      - name: Cache Cargo registry and build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Build frontend (production)
+        run: pnpm build
+
+      - name: cargo check (Tauri backend)
+        working-directory: src-tauri
+        run: cargo check --locked
+
+      - name: cargo test (Tauri backend)
+        working-directory: src-tauri
+        run: cargo test --locked
+
+      - name: Build Windows installers (MSI + NSIS)
+        run: pnpm tauri:build
+
+      - name: Locate installer artifacts
+        id: installers
+        shell: bash
+        run: |
+          msi=$(find src-tauri/target/release/bundle/msi -iname '*.msi' | head -n1)
+          nsis=$(find src-tauri/target/release/bundle/nsis -iname '*.exe' | head -n1)
+          echo "msi_found=$([ -n "$msi" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "nsis_found=$([ -n "$nsis" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "MSI: ${msi:-<none found>}"
+          echo "NSIS: ${nsis:-<none found>}"
+
+      - name: Fail if no installer was produced
+        if: steps.installers.outputs.msi_found != 'true' || steps.installers.outputs.nsis_found != 'true'
+        shell: bash
+        run: |
+          echo "::error::Expected both an MSI and an NSIS installer under src-tauri/target/release/bundle/, but at least one was missing."
+          exit 1
+
+      - name: Upload MSI installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: echoseed-windows-msi
+          path: src-tauri/target/release/bundle/msi/*.msi
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload NSIS installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: echoseed-windows-nsis-setup
+          path: src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload raw executable (for quick manual testing)
+        uses: actions/upload-artifact@v7
+        with:
+          name: echoseed-windows-exe
+          path: src-tauri/target/release/echoseed.exe
+          if-no-files-found: error
+          retention-days: 30
