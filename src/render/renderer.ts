@@ -1,12 +1,4 @@
-import {
-  Application,
-  Container,
-  Graphics,
-  Ticker,
-  BlurFilter,
-  Text,
-  TextStyle,
-} from "pixi.js";
+import { Application, Container, Graphics, Ticker, BlurFilter } from "pixi.js";
 import type { FrameData, RenderOrganism } from "../sim/protocol";
 import { CONFIG } from "../sim/config";
 
@@ -38,6 +30,18 @@ export class TerrariumRenderer {
   onPick: (id: number | null) => void = () => {};
 
   private ready = false;
+  // Set when destroy() is called before init() has finished resolving.
+  // Application.init() is async, so a caller that mounts and immediately
+  // unmounts (React 18 StrictMode's dev-mode double-invoke does exactly
+  // this on every mount, and any fast real-world remount could too) can
+  // call destroy() while this.app.ticker/this.app.destroy don't exist yet
+  // to operate on — that used to throw "Cannot read properties of
+  // undefined (reading 'remove')" and crash the app. Now destroy() just
+  // records the request, and init() checks it the moment the underlying
+  // Pixi Application is actually ready to be torn down, instead of half
+  // finishing setup on a renderer nobody wants anymore (which would leak a
+  // live ticker + WebGL context attached to an unmounted canvas).
+  private destroyRequested = false;
 
   constructor() {
     this.app = new Application();
@@ -58,6 +62,15 @@ export class TerrariumRenderer {
       preference: "webgl",
       powerPreference: "high-performance",
     });
+
+    if (this.destroyRequested) {
+      // Torn down before we finished starting up: app.init() has resolved
+      // now, so it's safe to destroy, and there's no point building out the
+      // rest of the scene graph for a renderer that's already unmounted.
+      this.app.destroy(true);
+      return;
+    }
+
     this.viewW = this.app.screen.width;
     this.viewH = this.app.screen.height;
 
@@ -258,6 +271,17 @@ export class TerrariumRenderer {
     return this.screenToWorld(screenX, screenY);
   }
 
+  /** Inverse of worldPointFromScreen — used by the e2e test hook to click
+   * an exact organism instead of scanning the canvas blindly (see
+   * App.tsx's window.__echoseedTestHook). */
+  screenPointFromWorld(worldX: number, worldY: number) {
+    const z = this.camera.zoom;
+    return {
+      x: worldX * z + (this.viewW / 2 - this.camera.x * z),
+      y: worldY * z + (this.viewH / 2 - this.camera.y * z),
+    };
+  }
+
   setSelected(id: number | null) {
     this.selectedId = id;
   }
@@ -282,12 +306,28 @@ export class TerrariumRenderer {
   }
 
   destroy() {
+    if (!this.ready) {
+      // init() is still in flight (or never started) — record the request
+      // and let init() finish tearing itself down once app.init() resolves.
+      this.destroyRequested = true;
+      return;
+    }
     this.app.ticker.remove(this.renderTick);
     this.app.destroy(true);
   }
 }
 
-const SPECIES_BASE_COLOR = [0x3ad29f, 0x53c0ff, 0xff5c8a];
+// Decorative oscillation (glow pulse, idle sway/shimmer) is dampened to
+// near-zero amplitude for users who've requested reduced motion at the OS
+// level — the underlying values (energy/health-driven scale and alpha)
+// still convey the same information, just without the animated wobble.
+// This intentionally does not touch simulation logic (movement, behavior),
+// only this renderer's cosmetic embellishment on top of it.
+const REDUCED_MOTION =
+  typeof window !== "undefined" &&
+  typeof window.matchMedia === "function" &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const MOTION_AMP = REDUCED_MOTION ? 0 : 1;
 
 /** A single procedurally-drawn organism. */
 class OrganismSprite {
@@ -398,18 +438,18 @@ class OrganismSprite {
         this.body.rotation = targetRot;
       }
       // Pulse glow with energy + subtle idle breathing.
-      const pulse = 0.85 + Math.sin(this.phase) * 0.12;
+      const pulse = 0.85 + Math.sin(this.phase) * 0.12 * MOTION_AMP;
       const energyScale = 0.6 + this.data.energyFrac * 0.6;
       this.glow.scale.set(pulse * energyScale);
     } else {
-      const sway = 1 + Math.sin(this.phase) * 0.05;
+      const sway = 1 + Math.sin(this.phase) * 0.05 * MOTION_AMP;
       this.body.scale.set(sway);
     }
 
     // Ascended creatures shimmer brighter.
     if (this.data.ascended) {
-      this.glow.alpha = 0.9 + Math.sin(this.phase * 2) * 0.1;
-      this.glow.scale.set(1.6 + Math.sin(this.phase * 3) * 0.2);
+      this.glow.alpha = 0.9 + Math.sin(this.phase * 2) * 0.1 * MOTION_AMP;
+      this.glow.scale.set(1.6 + Math.sin(this.phase * 3) * 0.2 * MOTION_AMP);
     } else {
       this.glow.alpha = 0.5 + this.data.healthFrac * 0.4;
     }

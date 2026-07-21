@@ -3,15 +3,13 @@ import { SimClient } from "./simClient";
 import { TerrariumRenderer } from "../render/renderer";
 import { storage } from "../platform/storage";
 import {
-  makeSave,
   loadSave,
   randomSeed,
-  DEFAULT_SETTINGS,
   DEFAULT_CREATURE,
   type UserSettings,
   type CreatureState,
 } from "../sim/save";
-import type { FrameData } from "../sim/protocol";
+import type { FrameData, RenderOrganism } from "../sim/protocol";
 import type { HistorySample, LineageNode, Organism, Genome } from "../sim/types";
 import { PopulationGraph, SpeciesRatioGraph } from "./components/Graphs";
 import { Inspector } from "./components/Inspector";
@@ -22,6 +20,16 @@ interface LogEntry {
   text: string;
 }
 
+declare global {
+  interface Window {
+    /** e2e-test-only surface — see the comment in the boot effect's onFrame. */
+    __echoseedTestHook?: {
+      organisms: RenderOrganism[];
+      screenPointFromWorld: (wx: number, wy: number) => { x: number; y: number };
+    };
+  }
+}
+
 const SPEEDS = [1, 2, 4, 8, 16];
 
 export function App() {
@@ -29,6 +37,21 @@ export function App() {
   const stageRef = useRef<HTMLDivElement>(null);
   const clientRef = useRef<SimClient | null>(null);
   const rendererRef = useRef<TerrariumRenderer | null>(null);
+  // Serializes PixiJS renderer init across the boot effect's invocations.
+  // React 18 StrictMode mounts, cleans up, and re-mounts this effect
+  // synchronously during dev, but `TerrariumRenderer.init()` is async and
+  // acquires a WebGL context on the *same* <canvas> DOM node each time
+  // (refs are stable across the double-invoke). Without this queue, the
+  // StrictMode throwaway invocation's init() and the real invocation's
+  // init() both start before either resolves, so two Pixi Applications
+  // race to own one WebGL context — Pixi doesn't crash, but the second
+  // context acquisition corrupts/loses the first, leaving the canvas
+  // permanently blank ("Could not retrieve shader source (WebGL context
+  // may be lost)" in the console, no visible error to the user). Chaining
+  // each invocation's init behind the previous one's settled promise
+  // means the throwaway invocation's init is skipped entirely (it sees
+  // `disposed === true` before its turn comes up) instead of racing.
+  const rendererTurnRef = useRef<Promise<void>>(Promise.resolve());
 
   const [frame, setFrame] = useState<FrameData | null>(null);
   const [history, setHistory] = useState<HistorySample[]>([]);
@@ -46,6 +69,13 @@ export function App() {
   const [toast, setToast] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
+  // Mirrors `frame` state without being a useCallback dependency: handlers
+  // that occasionally need "the current tick" (e.g. ascend(), for the event
+  // log) read this ref instead of closing over `frame` directly, so those
+  // handlers can have a stable identity across the ~30/sec frame updates
+  // instead of being recreated every time (which would defeat memoizing the
+  // child components — Inspector, the graphs — that receive them as props).
+  const frameRef = useRef<FrameData | null>(null);
   const creatureRef = useRef<CreatureState>({ ...DEFAULT_CREATURE });
   const lastCountsRef = useRef({ plants: 0, herbivores: 0, predators: 0 });
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -76,8 +106,20 @@ export function App() {
     };
 
     client.onFrame = (f) => {
+      frameRef.current = f;
       setFrame(f);
       renderer.setFrame(f);
+      // Test-only hook: organism sprites are canvas pixels, not DOM nodes,
+      // so Playwright locators can't find "an organism" directly. Blindly
+      // scanning click positions across the canvas (an earlier approach)
+      // is slow and statistically flaky — it can burn most of a test's
+      // timeout on bad luck alone. This exposes the live organism list plus
+      // the same world->screen transform the renderer itself uses, so e2e
+      // tests can click an exact, real organism instead of guessing.
+      window.__echoseedTestHook = {
+        organisms: f.organisms,
+        screenPointFromWorld: (wx: number, wy: number) => renderer.screenPointFromWorld(wx, wy),
+      };
       // Detect population events for the log.
       const prev = lastCountsRef.current;
       if (f.counts.predators > prev.predators && f.tick > 5)
@@ -95,15 +137,22 @@ export function App() {
       if (!disposed) setReady(true);
     };
 
+    const myTurn = rendererTurnRef.current.then(async () => {
+      if (disposed || !canvasRef.current || !stageRef.current) return;
+      await renderer.init(canvasRef.current, stageRef.current);
+    });
+    rendererTurnRef.current = myTurn.catch(() => {});
+
     (async () => {
-      if (canvasRef.current && stageRef.current) {
-        await renderer.init(canvasRef.current, stageRef.current);
-      }
+      await myTurn;
+      if (disposed) return; // unmounted while renderer.init() was in flight
+
       // Load persisted save or start fresh. `outcome.status` distinguishes a
       // genuine first launch ("empty") from a save that exists but could not
       // even be parsed ("corrupt") — the latter must never look like a fresh
       // start to the player without an explanation.
       const outcome = await storage.load();
+      if (disposed) return; // unmounted while storage.load() was in flight
       if (outcome.status === "empty") {
         const s = randomSeed();
         setSeed(s);
@@ -245,10 +294,10 @@ export function App() {
         | "setTemperature",
       opts: { x?: number; y?: number; value?: number; id?: number } = {},
     ) => {
-      clientRef.current?.intervene({ type: type as any, ...opts });
-      addLog(frame?.tick ?? 0, `intervention: ${type}`);
+      clientRef.current?.intervene({ type, ...opts });
+      addLog(frameRef.current?.tick ?? 0, `intervention: ${type}`);
     },
-    [frame, addLog],
+    [addLog],
   );
 
   // Click-to-place food or pick organism.
@@ -292,18 +341,35 @@ export function App() {
     dragState.current = null;
   };
 
-  const doFollow = (v: boolean) => {
-    setFollowing(v);
-    rendererRef.current?.setSelected(selectedId);
-    rendererRef.current?.followSelected(v);
-  };
+  const doFollow = useCallback(
+    (v: boolean) => {
+      setFollowing(v);
+      rendererRef.current?.setSelected(selectedId);
+      rendererRef.current?.followSelected(v);
+    },
+    [selectedId],
+  );
 
-  const ascend = (id: number) => {
-    clientRef.current?.ascend(id);
-    showToast(`Organism #${id} ascended to desktop creature`);
-    addLog(frame?.tick ?? 0, `#${id} ascended`);
-    void doSave();
-  };
+  const ascend = useCallback(
+    (id: number) => {
+      clientRef.current?.ascend(id);
+      showToast(`Organism #${id} ascended to desktop creature`);
+      addLog(frameRef.current?.tick ?? 0, `#${id} ascended`);
+      void doSave();
+    },
+    [showToast, addLog, doSave],
+  );
+
+  const removeSelected = useCallback(
+    (id: number) => {
+      intervene("remove", { id });
+      setSelected(null);
+      setSelectedId(null);
+    },
+    [intervene],
+  );
+
+  const mutateSelected = useCallback((id: number) => intervene("mutate", { id }), [intervene]);
 
   const resetWorld = () => {
     const s = randomSeed();
@@ -368,26 +434,50 @@ export function App() {
         <div className="section">
           <div className="section-title">Interventions</div>
           <div className="row">
-            <button className="btn" onClick={() => intervene("addFood", { value: 6 })}>
+            <button
+              className="btn"
+              title="Spawns a cluster of nutrient-rich plants near a random spot in the terrarium"
+              onClick={() => intervene("addFood", { value: 6 })}
+            >
               Add Food
             </button>
-            <button className="btn" onClick={() => intervene("addHerbivore")}>
+            <button
+              className="btn"
+              title="Spawns one new herbivore with a random genome at a random position"
+              onClick={() => intervene("addHerbivore")}
+            >
               + Herbivore
             </button>
           </div>
           <div className="row" style={{ marginTop: 6 }}>
-            <button className="btn" onClick={() => intervene("addPredator")}>
+            <button
+              className="btn"
+              title="Spawns one new predator with a random genome at a random position"
+              onClick={() => intervene("addPredator")}
+            >
               + Predator
             </button>
-            <button className="btn" onClick={() => intervene("rain", { value: 600 })}>
+            <button
+              className="btn"
+              title="Raises moisture toward saturation for 600 ticks, boosting plant growth"
+              onClick={() => intervene("rain", { value: 600 })}
+            >
               Trigger Rain
             </button>
           </div>
           <div className="row" style={{ marginTop: 6 }}>
-            <button className="btn" onClick={() => intervene("drought", { value: 600 })}>
+            <button
+              className="btn"
+              title="Lowers moisture and raises temperature for 600 ticks, stressing plant growth and food supply"
+              onClick={() => intervene("drought", { value: 600 })}
+            >
               Drought
             </button>
-            <button className="btn" onClick={() => intervene("cold", { value: 600 })}>
+            <button
+              className="btn"
+              title="Sharply lowers temperature for 600 ticks, raising metabolic cost for organisms poorly adapted to cold"
+              onClick={() => intervene("cold", { value: 600 })}
+            >
               Cold Period
             </button>
           </div>
@@ -401,6 +491,8 @@ export function App() {
             step={0.01}
             defaultValue={0.5}
             style={{ width: "100%" }}
+            aria-label="World base temperature"
+            title="Sets the terrarium's baseline temperature (cold ↔ hot)"
             onChange={(e) => intervene("setTemperature", { value: parseFloat(e.target.value) })}
           />
           <div className="stage-hint" style={{ position: "static", transform: "none", marginTop: 8, textAlign: "center" }}>
@@ -520,12 +612,8 @@ export function App() {
           organism={selected}
           lineage={lineage}
           onAscend={ascend}
-          onRemove={(id) => {
-            intervene("remove", { id });
-            setSelected(null);
-            setSelectedId(null);
-          }}
-          onMutate={(id) => intervene("mutate", { id })}
+          onRemove={removeSelected}
+          onMutate={mutateSelected}
           onFollow={doFollow}
           following={following}
           ascendedId={frame?.ascendedId ?? null}
