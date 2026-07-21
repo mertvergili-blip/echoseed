@@ -1,8 +1,19 @@
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import type { HistorySample } from "../../sim/types";
 
-/** Stacked population history line graph, drawn on a canvas. */
-export function PopulationGraph({ history }: { history: HistorySample[] }) {
+/**
+ * Stacked population history line graph, drawn on a canvas. Wrapped in
+ * memo(): `history` only updates on init/load/intervention (see the sim
+ * worker), much less often than the parent's ~30/sec `frame` state, so
+ * without memo this canvas effect's surrounding component body would
+ * needlessly re-run on every frame tick even though nothing it depends on
+ * changed.
+ */
+export const PopulationGraph = memo(function PopulationGraph({
+  history,
+}: {
+  history: HistorySample[];
+}) {
   const ref = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -59,10 +70,15 @@ export function PopulationGraph({ history }: { history: HistorySample[] }) {
   }, [history]);
 
   return <canvas ref={ref} className="graph" />;
-}
+});
 
-/** Species ratio stacked-bar over time. */
-export function SpeciesRatioGraph({ history }: { history: HistorySample[] }) {
+/** Species ratio stacked-bar over time. Memoized for the same reason as
+ * PopulationGraph above. */
+export const SpeciesRatioGraph = memo(function SpeciesRatioGraph({
+  history,
+}: {
+  history: HistorySample[];
+}) {
   const ref = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -103,4 +119,4 @@ export function SpeciesRatioGraph({ history }: { history: HistorySample[] }) {
   }, [history]);
 
   return <canvas ref={ref} className="graph" style={{ height: 46 }} />;
-}
+});

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import type { Organism, LineageNode, Genome } from "../../sim/types";
 import { GENOME_RANGES } from "../../sim/genome";
 import { ACTION_NAMES } from "../../sim/protocol";
@@ -102,7 +102,14 @@ function GenomeBar({ name, value, min, max }: { name: string; value: number; min
   );
 }
 
-export function Inspector({
+// Wrapped in memo(): the parent's `frame` state updates ~30/sec, but this
+// component's actual props (selected organism, lineage, ascendedId) change
+// far less often. Without memo, every frame tick would re-run this
+// component's full render body (genome bars, lineage list, portrait canvas
+// effect) for no visible difference in output. App.tsx keeps the callback
+// props (onAscend/onRemove/onMutate/onFollow) stable via useCallback so they
+// don't defeat this by looking "changed" on every render.
+export const Inspector = memo(function Inspector({
   organism,
   lineage,
   onAscend,
@@ -244,7 +251,7 @@ export function Inspector({
       </div>
     </div>
   );
-}
+});
 
 function actionIdx(o: Organism): number {
   return ACTION_NAMES.indexOf(o.action);

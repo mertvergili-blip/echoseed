@@ -101,10 +101,12 @@ function loop(now: number) {
   scheduleNext();
 }
 
-let timer: ReturnType<typeof setTimeout> | null = null;
+// Not cancelled explicitly: the worker is torn down wholesale via
+// worker.terminate() from the main thread (SimClient.destroy()), which
+// clears any pending timers as part of terminating the whole realm.
 function scheduleNext() {
   const interval = background ? 200 : FRAME_MS;
-  timer = setTimeout(() => loop(performance.now()), interval);
+  setTimeout(() => loop(performance.now()), interval);
 }
 
 self.onmessage = (ev: MessageEvent<ToWorker>) => {
