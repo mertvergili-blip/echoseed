@@ -61,7 +61,7 @@ class LocalStorageBackend implements StorageBackend {
 }
 
 class TauriStoreBackend implements StorageBackend {
-  private storePromise: Promise<any> | null = null;
+  private storePromise: Promise<import("@tauri-apps/plugin-store").Store> | null = null;
 
   private async store() {
     if (!this.storePromise) {

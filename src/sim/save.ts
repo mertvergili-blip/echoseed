@@ -102,7 +102,13 @@ export function loadSave(raw: unknown): LoadResult {
     if (!migrated.world || typeof migrated.world !== "object") {
       return fallback("missing world");
     }
-    if (!validateWorld(migrated.world)) return fallback("world failed validation");
+    // `migrated.world` is typed WorldSnapshot by the Partial<SaveFile> cast
+    // above, but it came from untrusted parsed JSON — that type is only a
+    // claim, not a guarantee. Treat it as unknown-shaped for the validation
+    // pass itself (which is the whole point of validateWorld).
+    if (!validateWorld(migrated.world as unknown as Unvalidated)) {
+      return fallback("world failed validation");
+    }
 
     // Sanitize each organism *before* constructing the World: clamp every
     // numeric field (genome values, health, energy, age, velocity, position)
@@ -145,20 +151,31 @@ function migrate(data: Partial<SaveFile>): Partial<SaveFile> {
   return data;
 }
 
-function validateWorld(w: any): boolean {
+/** A JSON object of unknown shape — the common type for untrusted save data
+ * before it has been validated field by field. Using this instead of `any`
+ * means every property read below still has to pass through a `typeof`/
+ * `Array.isArray` check (as this file already does) before it's trusted,
+ * rather than silently allowing typos or wrong-shape access through. */
+type Unvalidated = Record<string, unknown>;
+
+function isObject(v: unknown): v is Unvalidated {
+  return !!v && typeof v === "object";
+}
+
+function validateWorld(w: Unvalidated): boolean {
   if (typeof w.seed !== "string") return false;
   if (typeof w.tick !== "number" || !Number.isFinite(w.tick)) return false;
   if (!Array.isArray(w.organisms)) return false;
   if (!Array.isArray(w.rngState) || w.rngState.length !== 4) return false;
-  if (!w.environment || typeof w.environment !== "object") return false;
+  if (!isObject(w.environment)) return false;
   if (!Array.isArray(w.history)) w.history = [];
   if (!Array.isArray(w.lineage)) w.lineage = [];
   if (!Array.isArray(w.interventions)) w.interventions = [];
   return true;
 }
 
-function sanitizeSettings(s: any): UserSettings {
-  if (!s || typeof s !== "object") return { ...DEFAULT_SETTINGS };
+function sanitizeSettings(s: unknown): UserSettings {
+  if (!isObject(s)) return { ...DEFAULT_SETTINGS };
   return {
     simSpeed: clampNum(s.simSpeed, 1, 16, 1),
     paused: !!s.paused,
@@ -166,8 +183,8 @@ function sanitizeSettings(s: any): UserSettings {
   };
 }
 
-function sanitizeCreature(c: any): CreatureState {
-  if (!c || typeof c !== "object") return { ...DEFAULT_CREATURE };
+function sanitizeCreature(c: unknown): CreatureState {
+  if (!isObject(c)) return { ...DEFAULT_CREATURE };
   return {
     hunger: clampNum(c.hunger, 0, 1, 0.3),
     energy: clampNum(c.energy, 0, 1, 0.7),
@@ -180,7 +197,7 @@ function sanitizeCreature(c: any): CreatureState {
   };
 }
 
-function clampNum(v: any, min: number, max: number, dflt: number): number {
+function clampNum(v: unknown, min: number, max: number, dflt: number): number {
   if (typeof v !== "number" || !Number.isFinite(v)) return dflt;
   return Math.max(min, Math.min(max, v));
 }
@@ -188,19 +205,20 @@ function clampNum(v: any, min: number, max: number, dflt: number): number {
 const VALID_SPECIES: Species[] = ["plant", "herbivore", "predator"];
 const GENE_KEY_LIST = Object.keys(GENOME_RANGES) as (keyof Genome)[];
 
-function sanitizeGenome(raw: any): Genome {
+function sanitizeGenome(raw: unknown): Genome {
   const g = {} as Genome;
+  const src = isObject(raw) ? raw : {};
   for (const k of GENE_KEY_LIST) {
     const [min, max] = GENOME_RANGES[k];
-    const v = raw && typeof raw === "object" ? raw[k] : undefined;
-    g[k] = clampNum(v, min, max, (min + max) / 2) as never;
+    g[k] = clampNum(src[k], min, max, (min + max) / 2) as never;
   }
   return g;
 }
 
-function sanitizeVec(raw: any, maxMag: number): { x: number; y: number } {
-  const x = clampNum(raw?.x, -maxMag, maxMag, 0);
-  const y = clampNum(raw?.y, -maxMag, maxMag, 0);
+function sanitizeVec(raw: unknown, maxMag: number): { x: number; y: number } {
+  const src = isObject(raw) ? raw : {};
+  const x = clampNum(src.x, -maxMag, maxMag, 0);
+  const y = clampNum(src.y, -maxMag, maxMag, 0);
   return { x, y };
 }
 
@@ -213,8 +231,8 @@ function sanitizeVec(raw: any, maxMag: number): { x: number; y: number } {
  * creature.
  */
 function sanitizeOrganism(raw: unknown, seenIds: ReadonlySet<number>): Organism | null {
-  if (!raw || typeof raw !== "object") return null;
-  const o = raw as Record<string, any>;
+  if (!isObject(raw)) return null;
+  const o = raw;
 
   const id = o.id;
   if (typeof id !== "number" || !Number.isFinite(id) || !Number.isInteger(id) || id < 0) {
@@ -222,7 +240,10 @@ function sanitizeOrganism(raw: unknown, seenIds: ReadonlySet<number>): Organism 
   }
   if (seenIds.has(id)) return null; // duplicate id — keep the first occurrence
 
-  const species: Species = VALID_SPECIES.includes(o.species) ? o.species : "herbivore";
+  const species: Species =
+    typeof o.species === "string" && (VALID_SPECIES as string[]).includes(o.species)
+      ? (o.species as Species)
+      : "herbivore";
   const genome = sanitizeGenome(o.genome);
 
   // Recompute caps from the (now-valid) genome rather than trusting stored
@@ -240,10 +261,12 @@ function sanitizeOrganism(raw: unknown, seenIds: ReadonlySet<number>): Organism 
   pos.x = Math.max(0, Math.min(CONFIG.worldWidth, pos.x));
   pos.y = Math.max(0, Math.min(CONFIG.worldHeight, pos.y));
   const vel = sanitizeVec(o.vel, CONFIG.maxSpeedBase * 20); // generous but bounded
-  const target =
-    o.target && typeof o.target === "object" ? sanitizeVec(o.target, worldMax * 2) : null;
+  const target = isObject(o.target) ? sanitizeVec(o.target, worldMax * 2) : null;
 
-  const action = ACTION_NAMES.includes(o.action) ? o.action : "wander";
+  const action: Organism["action"] =
+    typeof o.action === "string" && (ACTION_NAMES as string[]).includes(o.action)
+      ? (o.action as Organism["action"])
+      : "wander";
 
   const rawParents = o.parentIds;
   const parentIds: [number, number] | null =
@@ -253,13 +276,11 @@ function sanitizeOrganism(raw: unknown, seenIds: ReadonlySet<number>): Organism 
       ? [rawParents[0], rawParents[1]]
       : null;
 
-  const m = o.memory && typeof o.memory === "object" ? o.memory : {};
+  const m: Unvalidated = isObject(o.memory) ? o.memory : {};
   const memory = {
-    lastThreatPos:
-      m.lastThreatPos && typeof m.lastThreatPos === "object" ? sanitizeVec(m.lastThreatPos, worldMax * 2) : null,
+    lastThreatPos: isObject(m.lastThreatPos) ? sanitizeVec(m.lastThreatPos, worldMax * 2) : null,
     lastThreatTick: clampNum(m.lastThreatTick, -1e9, 1e12, -99999),
-    lastFoodPos:
-      m.lastFoodPos && typeof m.lastFoodPos === "object" ? sanitizeVec(m.lastFoodPos, worldMax * 2) : null,
+    lastFoodPos: isObject(m.lastFoodPos) ? sanitizeVec(m.lastFoodPos, worldMax * 2) : null,
     lastFoodTick: clampNum(m.lastFoodTick, -1e9, 1e12, -99999),
     matingCooldown: clampNum(m.matingCooldown, 0, 1e6, 0),
   };
