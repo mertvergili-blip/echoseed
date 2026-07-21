@@ -17,17 +17,52 @@ function resolveAscended(): { genome: Genome; state: CreatureState } {
   return { genome: randomGenome(new Rng(randomSeed()), "herbivore"), state: { ...DEFAULT_CREATURE } };
 }
 
+interface StatsSnapshot {
+  hunger: number;
+  energy: number;
+  trust: number;
+  curiosity: number;
+  mood: string;
+  moodValue: number;
+  activity: string;
+  activeAnimation: string | null;
+  lastInteractionTick: number;
+}
+
+function snapshotStats(engine: CreatureEngine): StatsSnapshot {
+  return {
+    hunger: engine.state.hunger,
+    energy: engine.state.energy,
+    trust: engine.state.trust,
+    curiosity: engine.state.curiosity,
+    mood: engine.mood,
+    moodValue: engine.state.mood,
+    activity: engine.activity,
+    activeAnimation: engine.activeAnimation,
+    lastInteractionTick: engine.state.lastInteractionTick,
+  };
+}
+
 function CreatureApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<CreatureEngine | null>(null);
   const rendererRef = useRef<CreatureRenderer | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [status, setStatus] = useState("");
+  const [statsSnapshot, setStatsSnapshot] = useState<StatsSnapshot | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   // While true, the click-through hit-test loop is suppressed so the window
   // never starts ignoring cursor events mid-drag or while the context menu
   // (a real interactive overlay) is open.
   const suppressPassthrough = useRef(false);
+  // Cursor position in window-local [0,1] space, or null when the cursor
+  // isn't over this window — the only signal the creature engine reacts to
+  // (see the pointermove handler below). Read once per animation frame
+  // rather than driving React state, since it changes far too often for that.
+  const cursorRef = useRef<{ x: number; y: number } | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const returningRef = useRef(false);
 
   // Boot: load save, resolve ascended genome, catch up on offline time, start loop.
   useEffect(() => {
@@ -78,14 +113,29 @@ function CreatureApp() {
       setLoaded(true);
 
       let last = performance.now();
+      let statsThrottle = 0;
       const loop = (now: number) => {
         const dt = Math.min(0.1, (now - last) / 1000);
         last = now;
-        engine.update(dt);
+        const cursor = cursorRef.current;
+        engine.update(dt, cursor);
+        rendererRef.current?.setLookTarget(engine, cursor);
         rendererRef.current?.draw(engine, dt);
         setStatus(
           `${engine.mood} · ${engine.activity} · hun ${(engine.state.hunger * 100) | 0}% en ${(engine.state.energy * 100) | 0}%`,
         );
+        // Needs-panel/debug-panel state changes far less than every frame
+        // needs to be reflected on screen; throttle the React state update
+        // that drives them instead of doing it 60x/sec.
+        statsThrottle += dt;
+        if (statsThrottle > 0.15) {
+          statsThrottle = 0;
+          setStatsSnapshot(snapshotStats(engine));
+        }
+        if (engine.isReturning && engine.returnProgress >= 1 && !returningRef.current) {
+          returningRef.current = true;
+          void persistAndReturn(engine.state);
+        }
         raf = requestAnimationFrame(loop);
       };
       raf = requestAnimationFrame(loop);
@@ -93,6 +143,27 @@ function CreatureApp() {
 
     const onResize = () => rendererRef.current?.resize();
     window.addEventListener("resize", onResize);
+
+    // Track the cursor while it's over this window, in canvas-local [0,1]
+    // space, so the engine can notice/follow/flee from it. This is the
+    // window's own pointer events only — no global mouse hook, and (per the
+    // click-through system below) events don't even fire here while the
+    // cursor is over a transparent part of the window.
+    const onPointerMove = (e: PointerEvent) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+      cursorRef.current = {
+        x: Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)),
+        y: Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height)),
+      };
+    };
+    const onPointerLeave = () => {
+      cursorRef.current = null;
+    };
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerout", onPointerLeave);
 
     // Persist creature state periodically & on unload. beforeunload is
     // best-effort (see the Tauri close-requested handler below for the
@@ -111,8 +182,11 @@ function CreatureApp() {
       disposed = true;
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerout", onPointerLeave);
       window.removeEventListener("beforeunload", onUnload);
       clearInterval(saveTimer);
+      if (toastTimer.current) clearTimeout(toastTimer.current);
     };
   }, []);
 
@@ -310,7 +384,7 @@ function CreatureApp() {
     // `overflow: hidden` would otherwise clip it and make items unreachable.
     const clamped = clampMenuPosition(
       { x: e.clientX, y: e.clientY },
-      { w: 160, h: 190 },
+      { w: 168, h: 260 },
       { w: window.innerWidth, h: window.innerHeight },
     );
     setMenu(clamped);
@@ -321,23 +395,48 @@ function CreatureApp() {
     suppressPassthrough.current = false;
   };
 
+  const showToast = (text: string) => {
+    setToast(text);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 1800);
+  };
+
+  const burstAt = (kind: "feed" | "pet" | "wake") => {
+    const engine = engineRef.current;
+    const canvas = canvasRef.current;
+    const renderer = rendererRef.current;
+    if (!engine || !canvas || !renderer) return;
+    const r = 18 + engine.genome.bodySize * 16;
+    renderer.burst(kind, engine.x * canvas.clientWidth, engine.y * canvas.clientHeight, r);
+  };
+
   const act = async (action: string) => {
     const engine = engineRef.current;
     closeMenu();
     if (!engine) return;
     switch (action) {
-      case "feed":
-        engine.feed();
+      case "feed": {
+        const hungerDelta = engine.feed();
+        burstAt("feed");
+        showToast(`Fed — hunger ${hungerDelta > 0 ? "−" : ""}${Math.round(hungerDelta * 100)}%`);
         break;
-      case "pet":
+      }
+      case "pet": {
+        const trustBefore = engine.state.trust;
         engine.pet();
+        burstAt("pet");
+        showToast(`Petted — trust +${Math.round((engine.state.trust - trustBefore) * 100)}%`);
         break;
+      }
       case "sleep":
         engine.sleep();
+        showToast("Settling in to sleep…");
         break;
       case "return":
-        // Persist and close creature window / return to terrarium.
-        await persistAndReturn(engine.state);
+        // Play the dissolve animation first; the render loop calls
+        // persistAndReturn() once engine.returnProgress reaches 1, so the
+        // window doesn't just vanish mid-frame.
+        engine.beginReturn();
         break;
       case "open":
         await openTerrarium();
@@ -354,6 +453,8 @@ function CreatureApp() {
     >
       <canvas ref={canvasRef} />
       <div className="creature-status">{loaded ? status : "waking…"}</div>
+      {toast && <div className="creature-toast">{toast}</div>}
+      {import.meta.env.DEV && statsSnapshot && <DebugPanel stats={statsSnapshot} />}
       {menu && (
         // stopPropagation on pointerdown: without it, pressing a menu button
         // bubbles up to the stage's onPointerDown and calls startDragging(),
@@ -367,6 +468,7 @@ function CreatureApp() {
           style={{ left: menu.x, top: menu.y }}
           onPointerDown={(e) => e.stopPropagation()}
         >
+          {statsSnapshot && <StatsCard stats={statsSnapshot} />}
           <button onClick={() => act("feed")}>🍃 Feed</button>
           <button onClick={() => act("pet")}>✧ Pet</button>
           <button onClick={() => act("sleep")}>☾ Sleep</button>
@@ -374,6 +476,64 @@ function CreatureApp() {
           <button onClick={() => act("open")}>◱ Open Terrarium</button>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Compact, elegant stat card shown inside the right-click menu (the
+ * creature window is only 220×220px — too small for a separate floating
+ * panel without it overlapping/overflowing the menu itself). */
+function StatsCard({ stats }: { stats: StatsSnapshot }) {
+  const bars: [string, number][] = [
+    ["Hunger", stats.hunger],
+    ["Energy", stats.energy],
+    ["Trust", stats.trust],
+    ["Curiosity", stats.curiosity],
+    ["Mood", stats.moodValue],
+  ];
+  return (
+    <div className="creature-stats-card">
+      {bars.map(([label, v]) => (
+        <div className="creature-stat-row" key={label}>
+          <span className="csr-label">{label}</span>
+          <span className="csr-track">
+            <span className="csr-fill" style={{ width: `${Math.round(v * 100)}%` }} />
+          </span>
+        </div>
+      ))}
+      <div className="creature-stat-action">
+        {stats.mood} · {stats.activity}
+      </div>
+    </div>
+  );
+}
+
+/** Development-only overlay with raw engine state, for debugging mood/
+ * animation transitions without needing to open devtools. */
+function DebugPanel({ stats }: { stats: StatsSnapshot }) {
+  const lastAgo = stats.lastInteractionTick ? Math.round((Date.now() - stats.lastInteractionTick) / 1000) : null;
+  return (
+    <div className="debug-panel creature-debug-panel">
+      <div>
+        mood <span className="dv">{stats.mood}</span>
+      </div>
+      <div>
+        action <span className="dv">{stats.activity}</span>
+      </div>
+      <div>
+        anim <span className="dv">{stats.activeAnimation ?? "none"}</span>
+      </div>
+      <div>
+        hunger <span className="dv">{stats.hunger.toFixed(2)}</span> energy{" "}
+        <span className="dv">{stats.energy.toFixed(2)}</span>
+      </div>
+      <div>
+        trust <span className="dv">{stats.trust.toFixed(2)}</span>
+      </div>
+      <div>
+        last interaction{" "}
+        <span className="dv">{lastAgo == null ? "never" : `${lastAgo}s ago`}</span>
+      </div>
     </div>
   );
 }
