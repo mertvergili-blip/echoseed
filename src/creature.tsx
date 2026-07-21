@@ -9,6 +9,7 @@ import { CreatureRenderer } from "./creature/creatureRender";
 import { clampToMonitor, clampMenuPosition, offlineCatchupSeconds } from "./creature/windowMath";
 import type { Genome } from "./sim/types";
 import { isTauriRuntime } from "./platform/creatureWindow";
+import { ErrorBoundary } from "./app/ErrorBoundary";
 import "./styles.css";
 
 function resolveAscended(): { genome: Genome; state: CreatureState } {
@@ -433,6 +434,8 @@ async function openTerrarium() {
 const root = document.getElementById("creature-root")!;
 createRoot(root).render(
   <StrictMode>
-    <CreatureApp />
+    <ErrorBoundary label="Desktop Creature">
+      <CreatureApp />
+    </ErrorBoundary>
   </StrictMode>,
 );
