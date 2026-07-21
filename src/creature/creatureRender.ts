@@ -1,5 +1,15 @@
 import type { CreatureEngine } from "./creatureEngine";
 
+// Decorative wobble/bounce amplitude is dampened for prefers-reduced-motion
+// users; the underlying engine.bob timer keeps driving real movement/
+// activity logic unchanged (see CreatureEngine) — only this renderer's
+// cosmetic breathing/sway/particle output is scaled down.
+const REDUCED_MOTION =
+  typeof window !== "undefined" &&
+  typeof window.matchMedia === "function" &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const MOTION_AMP = REDUCED_MOTION ? 0 : 1;
+
 interface Particle {
   x: number;
   y: number;
@@ -46,7 +56,7 @@ export class CreatureRenderer {
     const asleep = engine.activity === "sleep";
     const mood = engine.mood;
 
-    const bob = Math.sin(engine.bob) * (asleep ? 1 : 3);
+    const bob = Math.sin(engine.bob) * (asleep ? 1 : 3) * MOTION_AMP;
 
     // Emit particles occasionally (more when happy/curious).
     const emitRate = asleep ? 0.02 : 0.08 + (mood === "happy" ? 0.12 : 0) + g.curiosity * 0.05;
@@ -83,8 +93,8 @@ export class CreatureRenderer {
       const a = (i / lobes) * Math.PI * 2;
       const wobble =
         1 +
-        Math.sin(a * 3 + engine.bob) * 0.08 * g.bodyProportion +
-        Math.cos(a * 2 - engine.bob * 0.7) * 0.05;
+        Math.sin(a * 3 + engine.bob) * 0.08 * g.bodyProportion * MOTION_AMP +
+        Math.cos(a * 2 - engine.bob * 0.7) * 0.05 * MOTION_AMP;
       const rr = baseR * wobble * (asleep ? 0.9 : 1);
       const x = Math.cos(a) * rr;
       const y = Math.sin(a) * rr * (asleep ? 0.7 : 0.92);
@@ -115,7 +125,7 @@ export class CreatureRenderer {
     for (let i = 0; i < tendrils; i++) {
       const a = Math.PI * 0.35 + (i / (tendrils - 1)) * Math.PI * 0.3 + Math.PI * 0.5;
       const len = baseR * (0.9 + g.bodyProportion * 0.8);
-      const sway = Math.sin(engine.bob * 1.5 + i) * 0.3;
+      const sway = Math.sin(engine.bob * 1.5 + i) * 0.3 * MOTION_AMP;
       ctx.beginPath();
       ctx.moveTo(Math.cos(a) * baseR * 0.6, Math.sin(a) * baseR * 0.6);
       ctx.quadraticCurveTo(
