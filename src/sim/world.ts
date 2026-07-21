@@ -665,7 +665,16 @@ export class World {
 
   private integrate(o: Organism): void {
     const speed = Math.hypot(o.vel.x, o.vel.y);
-    const cap = CONFIG.maxSpeedBase * o.genome.movementSpeed;
+    let cap = CONFIG.maxSpeedBase * o.genome.movementSpeed;
+    // Adrenaline burst: while actively fleeing, fearful prey can briefly
+    // exceed their normal top speed. Without this, flee speed was clamped to
+    // the ordinary movement cap, so a predator with even slightly higher
+    // movementSpeed always ran prey down and fear conferred no real escape
+    // advantage (verified in a head-to-head survival experiment). The burst
+    // costs proportionally more energy below, so it is not free.
+    if (o.action === "flee") {
+      cap *= 1 + o.genome.fear * CONFIG.fleeAdrenaline;
+    }
     if (speed > cap) {
       o.vel.x = (o.vel.x / speed) * cap;
       o.vel.y = (o.vel.y / speed) * cap;
@@ -673,8 +682,9 @@ export class World {
     o.pos.x += o.vel.x;
     o.pos.y += o.vel.y;
 
-    // Movement energy cost.
-    o.energy -= speed * CONFIG.moveCostFactor * o.genome.metabolism;
+    // Movement energy cost (paid on the actual, possibly boosted, speed).
+    const movedSpeed = Math.min(speed, cap);
+    o.energy -= movedSpeed * CONFIG.moveCostFactor * o.genome.metabolism;
 
     // Bounce off world edges.
     if (o.pos.x < 4) {

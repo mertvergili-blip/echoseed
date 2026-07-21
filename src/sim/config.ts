@@ -42,6 +42,7 @@ export const CONFIG = {
   maxSpeedBase: 1.4,
   wanderJitter: 0.35,
   fleeMultiplier: 1.4,
+  fleeAdrenaline: 0.5, // max fractional top-speed boost while fleeing (× fear)
   cohesionStrength: 0.01, // flocking pull toward same-species center (× sociability)
 
   // Environment
