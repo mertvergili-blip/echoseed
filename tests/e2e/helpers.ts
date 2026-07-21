@@ -123,10 +123,30 @@ export async function clickOrganism(
   const target = await page.evaluate((wantedIdx) => {
     const hook = window.__echoseedTestHook;
     if (!hook) return null;
-    const o = hook.organisms.find((o) => wantedIdx == null || o.species === wantedIdx);
-    if (!o) return null;
-    const p = hook.screenPointFromWorld(o.x, o.y);
-    return { id: o.id, species: o.species, x: p.x, y: p.y };
+    // The world uses cover-fit zoom (it fills the viewport and overspills its
+    // edges), so an organism of the requested species may project *outside*
+    // the visible canvas — clicking that point would land on a side panel and
+    // never select anything. Only consider organisms whose projected position
+    // sits comfortably inside the canvas, and prefer ones nearer the centre.
+    const cv = document.querySelector(".stage canvas") as HTMLCanvasElement | null;
+    const W = cv ? cv.clientWidth : 700;
+    const H = cv ? cv.clientHeight : 700;
+    const inset = 12;
+    let best: { id: number; species: number; x: number; y: number } | null = null;
+    let bestScore = Infinity;
+    for (const o of hook.organisms) {
+      if (wantedIdx != null && o.species !== wantedIdx) continue;
+      const p = hook.screenPointFromWorld(o.x, o.y);
+      if (p.x < inset || p.x > W - inset || p.y < inset || p.y > H - inset) continue;
+      const dx = p.x - W / 2;
+      const dy = p.y - H / 2;
+      const score = dx * dx + dy * dy;
+      if (score < bestScore) {
+        bestScore = score;
+        best = { id: o.id, species: o.species, x: p.x, y: p.y };
+      }
+    }
+    return best;
   }, species != null ? SPECIES_IDX[species] : undefined);
   if (!target) throw new Error(`clickOrganism: no ${species ?? "organism"} available to click`);
   const speciesNames = ["plant", "herbivore", "predator"] as const;

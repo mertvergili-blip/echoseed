@@ -1,7 +1,9 @@
-import { Application, Container, Graphics, Sprite, Texture, Ticker, BlurFilter } from "pixi.js";
+import { Application, Container, Graphics, Sprite, Texture, Ticker } from "pixi.js";
 import type { FrameData, RenderOrganism } from "../sim/protocol";
 import { CONFIG } from "../sim/config";
 import { generateTerrain, type Terrain } from "./terrain";
+import { drawCreatureBody, locomotionFor } from "./creatureBody";
+import { drawPlantForm, plantFormFor, type PlantForm } from "./plantForms";
 
 /**
  * PixiJS renderer for the terrarium. Draws organisms procedurally from their
@@ -20,6 +22,8 @@ export class TerrariumRenderer {
   private terrainSeed: string | null = null;
   private waterShimmer: Graphics | null = null;
   private shimmerTime = 0;
+  private wakeFx: Graphics;
+  private wakes: { x: number; y: number; life: number; max: number; size: number }[] = [];
   private sprites = new Map<number, OrganismSprite>();
   private lastFrame: FrameData | null = null;
   private prevPositions = new Map<number, { x: number; y: number }>();
@@ -54,6 +58,7 @@ export class TerrariumRenderer {
     this.app = new Application();
     this.world = new Container();
     this.terrainLayer = new Container();
+    this.wakeFx = new Graphics();
     this.shadowLayer = new Container();
     this.glowLayer = new Container();
     this.bodyLayer = new Container();
@@ -83,10 +88,15 @@ export class TerrariumRenderer {
     this.viewW = this.app.screen.width;
     this.viewH = this.app.screen.height;
 
-    // Layer order (bottom -> top): terrain, glow (blurred), bodies, selection.
-    const blur = new BlurFilter({ strength: 8, quality: 3 });
-    this.glowLayer.filters = [blur];
+    // Layer order (bottom -> top): terrain, glow, bodies, selection.
+    // No BlurFilter on the glow layer: a full-layer software blur pass every
+    // frame (over one soft circle per organism) was the single biggest GPU
+    // cost under the CPU/swiftshader renderer used in CI and on machines
+    // without a GPU. The soft glow is instead faked with a few concentric
+    // translucent circles per organism (see drawGlowShadow) — cheaper, and it
+    // also keeps the glow subtler, which suits the naturalistic art direction.
     this.world.addChild(this.terrainLayer);
+    this.world.addChild(this.wakeFx); // ripples on the water surface, under creatures
     this.world.addChild(this.shadowLayer);
     this.world.addChild(this.glowLayer);
     this.world.addChild(this.bodyLayer);
@@ -147,19 +157,38 @@ export class TerrariumRenderer {
     this.terrainLayer.addChild(this.waterShimmer);
   }
 
+  /** Minimum zoom at which the world still fully covers the viewport on both
+   * axes (cover-fit, not letterboxed fit). Used as the default zoom and the
+   * zoom-out clamp so the habitat always fills the screen — there are never
+   * black bands above/below or beside the world. */
+  private coverZoom(): number {
+    return Math.max(this.viewW / CONFIG.worldWidth, this.viewH / CONFIG.worldHeight);
+  }
+
   private centerCamera() {
-    this.camera.zoom = Math.min(
-      this.viewW / CONFIG.worldWidth,
-      this.viewH / CONFIG.worldHeight,
-    );
+    this.camera.zoom = this.coverZoom();
     this.camera.x = CONFIG.worldWidth / 2;
     this.camera.y = CONFIG.worldHeight / 2;
+  }
+
+  /** Keep the camera within world bounds so the viewport never shows past the
+   * world edge (which would reveal black). With cover-fit min zoom the world
+   * is always at least as large as the viewport, so the clamp range is valid. */
+  private clampCamera() {
+    const z = this.camera.zoom;
+    const halfW = this.viewW / (2 * z);
+    const halfH = this.viewH / (2 * z);
+    this.camera.x = Math.max(halfW, Math.min(CONFIG.worldWidth - halfW, this.camera.x));
+    this.camera.y = Math.max(halfH, Math.min(CONFIG.worldHeight - halfH, this.camera.y));
   }
 
   resize() {
     if (!this.ready) return;
     this.viewW = this.app.screen.width;
     this.viewH = this.app.screen.height;
+    // Never let a resize leave us zoomed out past full coverage.
+    this.camera.zoom = Math.max(this.camera.zoom, this.coverZoom());
+    this.clampCamera();
   }
 
   setFrame(frame: FrameData) {
@@ -230,16 +259,45 @@ export class TerrariumRenderer {
   /** Subtle, cheap water shimmer: a handful of soft specular glints on the
    * water surface, breathing in and out on their own phase. Dampened to
    * nothing under prefers-reduced-motion. */
+  private shimmerAccum = 0;
   private animateWater(dtMs: number) {
     const g = this.waterShimmer;
     const t = this.terrain;
     if (!g || !t || MOTION_AMP === 0) return;
     this.shimmerTime += dtMs * 0.001;
+    // The shimmer is decorative and low-frequency; rebuilding ~180 ellipses
+    // every frame is wasted work on the software renderer. Refresh at ~20fps.
+    this.shimmerAccum += dtMs;
+    if (this.shimmerAccum < 50) return;
+    this.shimmerAccum = 0;
     g.clear();
     for (const p of t.water) {
       const a = 0.06 + 0.12 * (0.5 + 0.5 * Math.sin(this.shimmerTime * 1.4 + p.phase));
       const sway = Math.sin(this.shimmerTime * 0.8 + p.phase) * 3;
       g.ellipse(p.x + sway, p.y, p.size, p.size * 0.4).fill({ color: 0x9fdfff, alpha: a });
+    }
+  }
+
+  /** Expanding, fading ripple rings left behind swimmers — cheap pooled
+   * effect that makes the water feel disturbed by life moving through it. */
+  private drawWakes(dtMs: number) {
+    const g = this.wakeFx;
+    g.clear();
+    const dt = dtMs * 0.001;
+    for (let i = this.wakes.length - 1; i >= 0; i--) {
+      const w = this.wakes[i];
+      w.life += dt;
+      if (w.life >= w.max) {
+        this.wakes.splice(i, 1);
+        continue;
+      }
+      const t = w.life / w.max;
+      const rr = w.size * (0.4 + t * 1.6);
+      g.ellipse(w.x, w.y, rr, rr * 0.5).stroke({
+        color: 0xbfe8ff,
+        width: 1.2,
+        alpha: 0.28 * (1 - t),
+      });
     }
   }
 
@@ -261,6 +319,10 @@ export class TerrariumRenderer {
       }
     }
 
+    // Keep the viewport inside the world every frame (covers follow drift,
+    // resize, and any accumulated pan), so black never shows at the edges.
+    this.clampCamera();
+
     // Apply camera transform to world container.
     const z = this.camera.zoom;
     this.world.scale.set(z);
@@ -269,7 +331,13 @@ export class TerrariumRenderer {
       this.viewH / 2 - this.camera.y * z,
     );
 
-    // Update sprite positions (interpolated) and animation.
+    // Update sprite positions (interpolated) and animation. Off-screen
+    // sprites are hidden and skipped (culling), and full per-limb animation
+    // only runs when zoomed in enough to see it (LOD) — so the cost of the
+    // animated bodies stays bounded regardless of total population.
+    const near = z >= 1.15;
+    const margin = 80;
+    const nowMs = performance.now();
     for (const [id, sprite] of this.sprites) {
       const prev = this.prevPositions.get(id);
       let x = sprite.data.x;
@@ -278,8 +346,31 @@ export class TerrariumRenderer {
         x = prev.x + (sprite.data.x - prev.x) * t;
         y = prev.y + (sprite.data.y - prev.y) * t;
       }
-      sprite.render(x, y, ticker.deltaMS);
+      const sx = x * z + (this.viewW / 2 - this.camera.x * z);
+      const sy = y * z + (this.viewH / 2 - this.camera.y * z);
+      const onScreen = sx > -margin && sx < this.viewW + margin && sy > -margin && sy < this.viewH + margin;
+      sprite.setVisible(onScreen);
+      if (!onScreen) continue;
+      if (this.terrain && nowMs - sprite.envSampleTime > 200) {
+        sprite.cachedInWater = this.terrain.isWater(x, y);
+        sprite.cachedElev = this.terrain.elevationAt(x, y);
+        sprite.envSampleTime = nowMs;
+      }
+      const inWater = sprite.cachedInWater;
+      sprite.render(x, y, ticker.deltaMS, inWater, near ? 1 : 0, sprite.cachedElev);
+
+      // Swimmers leave a fading wake ripple on the water surface. Only when
+      // zoomed in enough to actually see them (they're sub-pixel at far zoom),
+      // which also keeps the effect off the cheap far-zoom render path.
+      if (near && inWater && sprite.data.species !== 0 && MOTION_AMP > 0) {
+        const spd = Math.hypot(sprite.data.vx, sprite.data.vy);
+        if (spd > 0.4 && this.wakes.length < 120 && Math.random() < 0.25) {
+          const radius = 5 + sprite.data.size * 7;
+          this.wakes.push({ x, y, life: 0, max: 0.9, size: radius * 0.6 });
+        }
+      }
     }
+    if (near || this.wakes.length) this.drawWakes(ticker.deltaMS);
 
     // Selection ring.
     this.selectionRing.clear();
@@ -336,6 +427,13 @@ export class TerrariumRenderer {
     return this.screenToWorld(screenX, screenY);
   }
 
+  /** Whether a world point is over water — drives creature locomotion, and
+   * exposed to the e2e/visual test hook so a test can pick a swimmer vs a
+   * land-crawler deterministically. */
+  isWaterAt(worldX: number, worldY: number): boolean {
+    return this.terrain ? this.terrain.isWater(worldX, worldY) : false;
+  }
+
   /** Inverse of worldPointFromScreen — used by the e2e test hook to click
    * an exact organism instead of scanning the canvas blindly (see
    * App.tsx's window.__echoseedTestHook). */
@@ -364,10 +462,13 @@ export class TerrariumRenderer {
 
   zoomBy(factor: number, cx: number, cy: number) {
     const before = this.screenToWorld(cx, cy);
-    this.camera.zoom = Math.max(0.2, Math.min(4, this.camera.zoom * factor));
+    // Lower bound is cover-fit, not an arbitrary 0.2 — zooming out can never
+    // shrink the world smaller than the viewport.
+    this.camera.zoom = Math.max(this.coverZoom(), Math.min(5, this.camera.zoom * factor));
     const after = this.screenToWorld(cx, cy);
     this.camera.x += before.x - after.x;
     this.camera.y += before.y - after.y;
+    this.clampCamera();
   }
 
   destroy() {
@@ -403,7 +504,22 @@ class OrganismSprite {
   renderX = 0;
   renderY = 0;
   private phase: number;
-  private lastRedrawKey = "";
+  private animPhase = 0;
+  private prevHeading = 0;
+  private turnSmoothed = 0;
+  private lastKey = "";
+  private lastLod = -1;
+  private lastBodyDraw = -1;
+  // Cached habitat sample (water/elevation) — refreshed a few times a second
+  // in the render loop rather than every frame, since a creature crosses a
+  // shoreline far slower than 60fps. Cuts terrain grid-sampling ~12x.
+  cachedInWater = false;
+  cachedElev = 0.5;
+  envSampleTime = -1;
+  private genomeKey = "";
+  private keyHue = NaN;
+  private keySize = NaN;
+  private keyProp = NaN;
 
   constructor(data: RenderOrganism) {
     this.data = data;
@@ -411,11 +527,18 @@ class OrganismSprite {
     this.body = new Graphics();
     this.shadow = new Graphics();
     this.phase = (data.id % 100) * 0.37;
-    this.redraw();
+    this.animPhase = (data.id % 100) * 0.31;
+    this.prevHeading = Math.atan2(data.vy, data.vx);
   }
 
   updateData(data: RenderOrganism) {
     this.data = data;
+  }
+
+  setVisible(v: boolean) {
+    this.body.visible = v;
+    this.glow.visible = v;
+    this.shadow.visible = v;
   }
 
   private hueToRgb(h: number, s: number, l: number): number {
@@ -439,164 +562,152 @@ class OrganismSprite {
     );
   }
 
-  private redraw() {
+  /** Draw the glow aura + ground shadow (redrawn only when the genome-visual
+   * key changes, not every frame). */
+  private drawGlowShadow() {
     const d = this.data;
     const color = this.hueToRgb(d.hue, 0.7, 0.62);
-    const dark = this.hueToRgb(d.hue, 0.85, 0.32);
-    const light = this.hueToRgb(d.hue, 0.6, 0.78);
     const radius = 5 + d.size * 7;
-    this.body.clear();
     this.glow.clear();
     this.shadow.clear();
-
-    // Soft contact shadow (drawn unrotated in shadowLayer) grounds the
-    // organism on the terrain so it doesn't read as a floating sticker.
-    const shR = radius * (d.species === 0 ? 0.9 : 1.15);
-    this.shadow.ellipse(0, 0, shR, shR * 0.42).fill({ color: 0x03060a, alpha: 0.32 });
-
     if (d.species === 0) {
-      // Plant: layered foliage rosette with a seed core.
-      const blades = 5 + Math.floor(d.proportion * 4);
-      for (let ring = 0; ring < 2; ring++) {
-        const len = radius * (1.0 + d.proportion * 0.9) * (ring === 0 ? 1 : 0.6);
-        const rot = ring * 0.4;
-        for (let i = 0; i < blades; i++) {
-          const a = (i / blades) * Math.PI * 2 + rot;
-          this.body
-            .moveTo(0, 0)
-            .quadraticCurveTo(
-              Math.cos(a - 0.15) * len * 0.5,
-              Math.sin(a - 0.15) * len * 0.5,
-              Math.cos(a) * len * 0.42,
-              Math.sin(a) * len,
-            )
-            .stroke({ color: ring === 0 ? dark : color, width: 2, alpha: 0.85 });
-        }
-      }
-      this.body.circle(0, 0, radius * 0.55).fill({ color: dark, alpha: 0.95 });
-      this.body.circle(-radius * 0.12, -radius * 0.12, radius * 0.3).fill({ color: light, alpha: 0.9 });
-      this.glow.circle(0, 0, radius * 1.5).fill({ color, alpha: 0.16 });
-    } else if (d.species === 1) {
-      // Herbivore: streamlined body with a distinct head, paired fins/legs,
-      // and a tapering tail — reads as a small foraging animal, not a blob.
-      const bodyLen = radius * 1.5;
-      // fins/legs (behind body)
-      const limbs = 2 + Math.floor(d.proportion * 2);
-      for (let i = 0; i < limbs; i++) {
-        const along = -bodyLen * 0.3 - i * radius * 0.5;
-        for (const side of [-1, 1]) {
-          this.body
-            .moveTo(along, side * radius * 0.5)
-            .quadraticCurveTo(along - radius * 0.4, side * radius * 1.1, along - radius * 0.7, side * radius * 0.9)
-            .stroke({ color: dark, width: 2, alpha: 0.75 });
-        }
-      }
-      // tail
-      this.body
-        .moveTo(-bodyLen * 0.7, 0)
-        .lineTo(-bodyLen * 1.15, -radius * 0.4)
-        .lineTo(-bodyLen * 1.15, radius * 0.4)
-        .fill({ color: dark, alpha: 0.85 });
-      // main body
-      this.body.ellipse(0, 0, bodyLen, radius * 0.85).fill({ color: dark, alpha: 0.96 });
-      this.body.ellipse(radius * 0.1, -radius * 0.15, bodyLen * 0.7, radius * 0.5).fill({ color, alpha: 0.9 });
-      // head
-      this.body.circle(bodyLen * 0.72, 0, radius * 0.62).fill({ color, alpha: 0.95 });
-      this.body.circle(bodyLen * 0.62, -radius * 0.18, radius * 0.28).fill({ color: light, alpha: 0.7 });
-      // eye
-      this.body.circle(bodyLen * 0.85, -radius * 0.12, radius * 0.16).fill({ color: 0x05100a, alpha: 0.9 });
-      this.body.circle(bodyLen * 0.88, -radius * 0.16, radius * 0.06).fill({ color: 0xffffff, alpha: 0.9 });
-      this.glow.circle(0, 0, radius * 1.9).fill({ color, alpha: 0.2 });
+      // Plants: a wide flat ground shadow at the base, and only a whisper of
+      // glow up in the foliage (no neon halo — plants aren't light sources).
+      this.shadow.ellipse(0, 0, radius * 1.0, radius * 0.32).fill({ color: 0x03060a, alpha: 0.28 });
+      this.glow.circle(0, -radius * 0.9, radius * 1.1).fill({ color, alpha: 0.06 });
     } else {
-      // Predator: sleek hunter with a pointed jaw, dorsal spines, and a
-      // powerful tail — an unmistakably different silhouette from prey.
-      const bodyLen = radius * 1.7;
-      // dorsal spines
-      const spikes = 3 + Math.floor(d.proportion * 3);
-      for (let i = 0; i < spikes; i++) {
-        const along = bodyLen * 0.3 - (i / spikes) * bodyLen * 1.1;
-        this.body
-          .moveTo(along, -radius * 0.4)
-          .lineTo(along + radius * 0.2, -radius * 1.15)
-          .lineTo(along + radius * 0.45, -radius * 0.4)
-          .fill({ color: dark, alpha: 0.9 });
-      }
-      // tail
-      this.body
-        .moveTo(-bodyLen * 0.75, 0)
-        .quadraticCurveTo(-bodyLen * 1.2, -radius * 0.7, -bodyLen * 1.3, -radius * 0.2)
-        .quadraticCurveTo(-bodyLen * 1.1, 0, -bodyLen * 1.3, radius * 0.2)
-        .quadraticCurveTo(-bodyLen * 1.2, radius * 0.7, -bodyLen * 0.75, 0)
-        .fill({ color: dark, alpha: 0.9 });
-      // body
-      this.body
-        .moveTo(bodyLen * 1.05, 0)
-        .quadraticCurveTo(bodyLen * 0.3, -radius, -bodyLen * 0.75, 0)
-        .quadraticCurveTo(bodyLen * 0.3, radius, bodyLen * 1.05, 0)
-        .fill({ color: dark, alpha: 0.96 });
-      this.body
-        .moveTo(bodyLen * 0.9, 0)
-        .quadraticCurveTo(bodyLen * 0.2, -radius * 0.55, -bodyLen * 0.4, 0)
-        .quadraticCurveTo(bodyLen * 0.2, radius * 0.55, bodyLen * 0.9, 0)
-        .fill({ color, alpha: 0.85 });
-      // jaw + eye
-      this.body
-        .moveTo(bodyLen * 1.05, 0)
-        .lineTo(bodyLen * 0.7, -radius * 0.28)
-        .lineTo(bodyLen * 0.7, radius * 0.28)
-        .fill({ color: light, alpha: 0.5 });
-      this.body.circle(bodyLen * 0.6, -radius * 0.22, radius * 0.16).fill({ color: 0xffe0e0, alpha: 0.95 });
-      this.body.circle(bodyLen * 0.6, -radius * 0.22, radius * 0.07).fill({ color: 0x300000, alpha: 0.95 });
-      this.glow.circle(0, 0, radius * 2.1).fill({ color, alpha: 0.24 });
+      this.shadow.ellipse(0, 0, radius * 1.25, radius * 0.4).fill({ color: 0x03060a, alpha: 0.3 });
+      // Fake a soft glow with a few concentric translucent rings (no filter).
+      this.glow.circle(0, 0, radius * 2.0).fill({ color, alpha: 0.08 });
+      this.glow.circle(0, 0, radius * 1.5).fill({ color, alpha: 0.1 });
+      this.glow.circle(0, 0, radius * 1.05).fill({ color, alpha: 0.12 });
     }
-    this.lastRedrawKey = `${Math.round(d.hue)}:${d.size.toFixed(2)}:${d.species}:${d.proportion.toFixed(2)}`;
   }
 
-  render(x: number, y: number, dtMs: number) {
+  private plantForm: PlantForm = "shrub";
+
+  /** Draw the plant at its chosen form (static; wind sway applied per-frame). */
+  private drawPlant(motion: number) {
+    this.body.clear();
+    const growth = 0.55 + this.data.energyFrac * 0.45;
+    drawPlantForm(this.body, this.data, this.plantForm, this.animPhase, motion, growth);
+  }
+
+  /**
+   * @param inWater whether the organism is over water (drives swim vs crawl)
+   * @param lod 1 = near (full per-frame limb animation), 0 = far (cached static pose)
+   */
+  render(x: number, y: number, dtMs: number, inWater: boolean, lod: number, elev: number) {
     this.renderX = x;
     this.renderY = y;
     this.phase += dtMs * 0.004;
+    this.animPhase += dtMs * 0.001;
+    const d = this.data;
+    const radius = 5 + d.size * 7;
 
-    // Redraw only if genome-visual key changed (rare).
-    const key = `${Math.round(this.data.hue)}:${this.data.size.toFixed(2)}:${this.data.species}:${this.data.proportion.toFixed(2)}`;
-    if (key !== this.lastRedrawKey) this.redraw();
-
-    const radius = 5 + this.data.size * 7;
-    this.body.position.set(x, y);
-    this.glow.position.set(x, y);
-    // Shadow sits slightly below the body and never rotates, so motion reads
-    // as the creature moving over the ground rather than the ground with it.
-    this.shadow.position.set(x, y + radius * 0.5);
-
-    // Rotate toward velocity for mobile creatures.
-    if (this.data.species !== 0) {
-      const speed = Math.hypot(this.data.vx, this.data.vy);
-      if (speed > 0.05) {
-        const targetRot = Math.atan2(this.data.vy, this.data.vx);
-        this.body.rotation = targetRot;
-        // Keep the creature upright (belly-down) rather than flipping upside
-        // down when it swims/walks leftward.
-        this.body.scale.y = Math.cos(targetRot) < 0 ? -1 : 1;
-      }
-      // Gentle "swim/step" bob perpendicular to travel + glow breathing.
-      const gait = Math.sin(this.phase * 3) * 0.06 * MOTION_AMP;
-      this.body.scale.x = 1 + gait;
-      const pulse = 0.85 + Math.sin(this.phase) * 0.12 * MOTION_AMP;
-      const energyScale = 0.6 + this.data.energyFrac * 0.6;
-      this.glow.scale.set(pulse * energyScale);
-      // Shadow shrinks a touch on the up-beat of the gait for liveliness.
-      this.shadow.scale.set(1 - Math.abs(gait) * 0.8);
+    let loco: string;
+    if (d.species === 0) {
+      const landHeight = Math.max(0, (elev - 0.4) / 0.6);
+      this.plantForm = plantFormFor(d, inWater, landHeight);
+      loco = this.plantForm; // form participates in the redraw key
     } else {
-      const sway = 1 + Math.sin(this.phase) * 0.05 * MOTION_AMP;
-      this.body.scale.set(sway);
+      loco = inWater ? "swim" : "crawl";
+    }
+    // The genome portion of the redraw key is constant over the organism's
+    // life (only a rare in-place mutation changes it), so cache it behind a
+    // cheap numeric guard instead of running toFixed() 200×/frame.
+    if (d.hue !== this.keyHue || d.size !== this.keySize || d.proportion !== this.keyProp) {
+      this.keyHue = d.hue;
+      this.keySize = d.size;
+      this.keyProp = d.proportion;
+      this.genomeKey = `${Math.round(d.hue)}:${d.size.toFixed(2)}:${d.proportion.toFixed(2)}:${d.species}`;
+    }
+    const key = this.genomeKey + ":" + loco;
+    const keyChanged = key !== this.lastKey;
+    if (keyChanged) {
+      this.drawGlowShadow();
+      if (d.species === 0) this.drawPlant(lod >= 1 ? MOTION_AMP : 0);
+      this.lastKey = key;
     }
 
-    // Ascended creatures shimmer brighter.
-    if (this.data.ascended) {
+    this.body.position.set(x, y);
+    this.glow.position.set(x, y);
+    // Plants are drawn base-at-origin growing upward, so their shadow sits at
+    // the base (origin), not below the visual centre.
+    this.shadow.position.set(x, d.species === 0 ? y + radius * 0.15 : y + radius * 0.5);
+
+    if (d.species !== 0) {
+      const rawSpeed = Math.hypot(d.vx, d.vy);
+      const speed01 = Math.max(0, Math.min(1, rawSpeed / 2));
+      let heading = this.prevHeading;
+      if (rawSpeed > 0.02) heading = Math.atan2(d.vy, d.vx);
+      // Smoothed signed turn rate feeds the body's curve-into-turns.
+      let dh = heading - this.prevHeading;
+      while (dh > Math.PI) dh -= Math.PI * 2;
+      while (dh < -Math.PI) dh += Math.PI * 2;
+      this.turnSmoothed += (Math.max(-1, Math.min(1, dh * 12)) - this.turnSmoothed) * 0.25;
+      this.prevHeading = heading;
+
+      const near = lod >= 1;
+      // Animate limb-level detail at ~30fps rather than every frame — the
+      // difference is imperceptible but it roughly halves the redraw cost of
+      // the multi-part bodies, which matters on the software renderer.
+      if (near && (keyChanged || this.lastLod !== lod || this.animPhase - this.lastBodyDraw > 0.033)) {
+        this.lastBodyDraw = this.animPhase;
+        this.body.clear();
+        drawCreatureBody(this.body, d, locomotionFor(inWater), {
+          phase: this.animPhase,
+          speed: speed01,
+          turn: this.turnSmoothed,
+          action: d.action,
+          lod,
+          motion: MOTION_AMP,
+        });
+      } else if (!near && (keyChanged || this.lastLod !== lod)) {
+        // Far LOD: cheap static pose, redrawn only on change.
+        this.body.clear();
+        drawCreatureBody(this.body, d, locomotionFor(inWater), {
+          phase: this.animPhase,
+          speed: 0,
+          turn: 0,
+          action: d.action,
+          lod,
+          motion: 0,
+        });
+      }
+      this.lastLod = lod;
+
+      this.body.rotation = heading;
+      this.body.scale.set(1, Math.cos(heading) < 0 ? -1 : 1);
+
+      const pulse = 0.85 + Math.sin(this.phase) * 0.12 * MOTION_AMP;
+      const energyScale = 0.6 + d.energyFrac * 0.6;
+      this.glow.scale.set(pulse * energyScale);
+      this.shadow.scale.set(1);
+    } else {
+      // Plant: gentle wind lean via a small shear anchored at the base (the
+      // plant is drawn growing up from origin). When zoomed in, redraw the
+      // form each frame so leaves/blades actually sway rather than the whole
+      // sprite skewing rigidly.
+      this.body.rotation = 0;
+      this.body.scale.set(1, 1);
+      if (lod >= 1 && MOTION_AMP > 0) {
+        // Redraw the swaying foliage at ~30fps, same as animal bodies.
+        if (this.animPhase - this.lastBodyDraw > 0.033) {
+          this.lastBodyDraw = this.animPhase;
+          this.drawPlant(MOTION_AMP);
+        }
+        this.body.skew.set(Math.sin(this.phase * 0.9 + d.id) * 0.03, 0);
+      } else {
+        this.body.skew.set(0, 0);
+      }
+    }
+
+    if (d.ascended) {
       this.glow.alpha = 0.9 + Math.sin(this.phase * 2) * 0.1 * MOTION_AMP;
       this.glow.scale.set(1.6 + Math.sin(this.phase * 3) * 0.2 * MOTION_AMP);
     } else {
-      this.glow.alpha = 0.5 + this.data.healthFrac * 0.4;
+      this.glow.alpha = 0.5 + d.healthFrac * 0.4;
     }
   }
 

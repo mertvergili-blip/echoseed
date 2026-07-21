@@ -26,6 +26,7 @@ declare global {
     __echoseedTestHook?: {
       organisms: RenderOrganism[];
       screenPointFromWorld: (wx: number, wy: number) => { x: number; y: number };
+      isWater: (wx: number, wy: number) => boolean;
     };
   }
 }
@@ -119,6 +120,7 @@ export function App() {
       window.__echoseedTestHook = {
         organisms: f.organisms,
         screenPointFromWorld: (wx: number, wy: number) => renderer.screenPointFromWorld(wx, wy),
+        isWater: (wx: number, wy: number) => renderer.isWaterAt(wx, wy),
       };
       // Detect population events for the log.
       const prev = lastCountsRef.current;

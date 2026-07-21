@@ -21,7 +21,11 @@ export type ToWorker =
   | { type: "requestSnapshot"; token: number }
   | { type: "requestFullOrganism"; id: number };
 
-/** Lightweight per-organism render payload (avoids shipping full objects). */
+/** Lightweight per-organism render payload (avoids shipping full objects).
+ * Carries a small set of genome traits (beyond hue/size/proportion) so the
+ * renderer can build genuinely different, trait-driven body morphologies —
+ * aggression shapes the jaw, fear the sensory frills, curiosity the antennae,
+ * sociability the eyes — without shipping the whole organism each frame. */
 export interface RenderOrganism {
   id: number;
   species: 0 | 1 | 2; // plant, herbivore, predator
@@ -32,6 +36,10 @@ export interface RenderOrganism {
   hue: number;
   size: number;
   proportion: number;
+  aggression: number;
+  fear: number;
+  curiosity: number;
+  sociability: number;
   energyFrac: number;
   healthFrac: number;
   action: number;

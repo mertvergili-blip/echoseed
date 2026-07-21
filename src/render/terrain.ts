@@ -156,7 +156,10 @@ export function generateTerrain(seed: string, worldW: number, worldH: number): T
   if (cached) return cached;
 
   const s = seedToInt(seed);
-  const TW = 480;
+  // Texture resolution: higher = sharper when the player zooms in close,
+  // at a one-time generation cost (cached per seed). 640 keeps close-ups
+  // legible without a jarring boot stall.
+  const TW = 640;
   const TH = Math.round((TW * worldH) / worldW);
   const seaLevel = 0.4;
 
