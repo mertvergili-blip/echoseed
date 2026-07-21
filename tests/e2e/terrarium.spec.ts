@@ -96,6 +96,11 @@ test("add food increases plant population", async ({ trackedPage: page }) => {
 test("add herbivore increases herbivore population", async ({ trackedPage: page }) => {
   await page.goto("/");
   await waitForTickAdvance(page, 1, 10000);
+  // Pause before counting: interventions apply immediately regardless of
+  // pause state, but a running sim can have predators eat herbivores faster
+  // than the +1 is added within the poll window (flaky "expected 25, got
+  // 23"). Same rationale as the "add food" test above.
+  await page.getByText("❚❚ Pause", { exact: true }).click();
   const before = await speciesCounts(page);
   await page.getByRole("button", { name: "+ Herbivore" }).click();
   await expect
@@ -106,6 +111,7 @@ test("add herbivore increases herbivore population", async ({ trackedPage: page 
 test("add predator increases predator population", async ({ trackedPage: page }) => {
   await page.goto("/");
   await waitForTickAdvance(page, 1, 10000);
+  await page.getByText("❚❚ Pause", { exact: true }).click();
   const before = await speciesCounts(page);
   await page.getByRole("button", { name: "+ Predator" }).click();
   await expect

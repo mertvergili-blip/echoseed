@@ -156,11 +156,13 @@ export function App() {
       if (outcome.status === "empty") {
         const s = randomSeed();
         setSeed(s);
+        renderer.buildTerrain(s);
         client.init(s);
         addLog(0, `new world seeded: ${s}`);
       } else {
         const result = loadSave(outcome.status === "ok" ? outcome.data : null);
         setSeed(result.world.seed);
+        renderer.buildTerrain(result.world.seed);
         setSpeed(result.settings.simSpeed);
         setPaused(result.settings.paused);
         setShowDebug(result.settings.showDebug);
@@ -379,6 +381,7 @@ export function App() {
     setLog([]);
     setHistory([]);
     creatureRef.current = { ...DEFAULT_CREATURE };
+    rendererRef.current?.buildTerrain(s);
     clientRef.current?.init(s);
     addLog(0, `reset with new seed: ${s}`);
     showToast(`New world: ${s}`);

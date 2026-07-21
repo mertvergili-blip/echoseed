@@ -1,6 +1,7 @@
-import { Application, Container, Graphics, Ticker, BlurFilter } from "pixi.js";
+import { Application, Container, Graphics, Sprite, Texture, Ticker, BlurFilter } from "pixi.js";
 import type { FrameData, RenderOrganism } from "../sim/protocol";
 import { CONFIG } from "../sim/config";
+import { generateTerrain, type Terrain } from "./terrain";
 
 /**
  * PixiJS renderer for the terrarium. Draws organisms procedurally from their
@@ -10,9 +11,15 @@ import { CONFIG } from "../sim/config";
 export class TerrariumRenderer {
   app: Application;
   private world: Container;
+  private terrainLayer: Container;
+  private shadowLayer: Container;
   private glowLayer: Container;
   private bodyLayer: Container;
   private overlay: Container;
+  private terrain: Terrain | null = null;
+  private terrainSeed: string | null = null;
+  private waterShimmer: Graphics | null = null;
+  private shimmerTime = 0;
   private sprites = new Map<number, OrganismSprite>();
   private lastFrame: FrameData | null = null;
   private prevPositions = new Map<number, { x: number; y: number }>();
@@ -46,6 +53,8 @@ export class TerrariumRenderer {
   constructor() {
     this.app = new Application();
     this.world = new Container();
+    this.terrainLayer = new Container();
+    this.shadowLayer = new Container();
     this.glowLayer = new Container();
     this.bodyLayer = new Container();
     this.overlay = new Container();
@@ -74,9 +83,11 @@ export class TerrariumRenderer {
     this.viewW = this.app.screen.width;
     this.viewH = this.app.screen.height;
 
-    // Layer order: glow (blurred) under bodies, overlay on top.
+    // Layer order (bottom -> top): terrain, glow (blurred), bodies, selection.
     const blur = new BlurFilter({ strength: 8, quality: 3 });
     this.glowLayer.filters = [blur];
+    this.world.addChild(this.terrainLayer);
+    this.world.addChild(this.shadowLayer);
     this.world.addChild(this.glowLayer);
     this.world.addChild(this.bodyLayer);
     this.world.addChild(this.selectionRing);
@@ -92,23 +103,48 @@ export class TerrariumRenderer {
   }
 
   private drawBackground() {
-    // Subtle grid / vignette drawn once, parented to world so it pans.
+    // Dark base fill shown until terrain is generated (and behind the water
+    // edges). A thin border frames the world bounds.
     const bg = new Graphics();
-    bg.rect(0, 0, CONFIG.worldWidth, CONFIG.worldHeight).fill({ color: 0x060a12, alpha: 1 });
-    // faint microscope grid
-    for (let x = 0; x <= CONFIG.worldWidth; x += 80) {
-      bg.moveTo(x, 0).lineTo(x, CONFIG.worldHeight);
-    }
-    for (let y = 0; y <= CONFIG.worldHeight; y += 80) {
-      bg.moveTo(0, y).lineTo(CONFIG.worldWidth, y);
-    }
-    bg.stroke({ color: 0x0e1a2b, width: 1, alpha: 0.6 });
+    bg.rect(0, 0, CONFIG.worldWidth, CONFIG.worldHeight).fill({ color: 0x060a10, alpha: 1 });
     bg.rect(0, 0, CONFIG.worldWidth, CONFIG.worldHeight).stroke({
-      color: 0x1b3550,
+      color: 0x14283c,
       width: 2,
-      alpha: 0.8,
+      alpha: 0.7,
     });
-    this.world.addChildAt(bg, 0);
+    this.terrainLayer.addChildAt(bg, 0);
+  }
+
+  /**
+   * Generate and paint the procedural habitat for a given world seed. Called
+   * from the app once the seed is known; idempotent per seed so the render
+   * loop / StrictMode double-invoke won't rebuild it repeatedly.
+   */
+  buildTerrain(seed: string) {
+    if (!this.ready || this.terrainSeed === seed) return;
+    this.terrainSeed = seed;
+    // Clear any previous terrain (e.g. after Reset with a new seed), keeping
+    // the dark base fill at index 0.
+    while (this.terrainLayer.children.length > 1) {
+      const c = this.terrainLayer.children[this.terrainLayer.children.length - 1];
+      this.terrainLayer.removeChild(c);
+      c.destroy({ children: true });
+    }
+    this.waterShimmer = null;
+
+    const t = generateTerrain(seed, CONFIG.worldWidth, CONFIG.worldHeight);
+    this.terrain = t;
+
+    // The terrain texture already includes baked vegetation/rock, so the
+    // whole habitat is a single sprite — cheap to draw every frame.
+    const bg = new Sprite(Texture.from(t.canvas));
+    bg.width = CONFIG.worldWidth;
+    bg.height = CONFIG.worldHeight;
+    this.terrainLayer.addChild(bg);
+
+    // Animated water shimmer (updated each frame in renderTick).
+    this.waterShimmer = new Graphics();
+    this.terrainLayer.addChild(this.waterShimmer);
   }
 
   private centerCamera() {
@@ -147,6 +183,7 @@ export class TerrariumRenderer {
       if (!sprite) {
         sprite = new OrganismSprite(o);
         this.sprites.set(o.id, sprite);
+        this.shadowLayer.addChild(sprite.shadow);
         this.glowLayer.addChild(sprite.glow);
         this.bodyLayer.addChild(sprite.body);
       }
@@ -167,22 +204,50 @@ export class TerrariumRenderer {
   }
 
   private updateNight(timeOfDay: number, weather: string) {
-    // Darken toward midnight; tint blue on cold, grey on drought.
+    // Atmospheric day/night wash: cool-dark at night, warm at dawn/dusk,
+    // near-clear at noon, tinted by weather. Plus a soft vignette always, so
+    // the habitat reads as a lit scene rather than a flat sprite sheet.
     const daylight = Math.max(0, Math.sin(timeOfDay * Math.PI)); // 0 at night edges
-    const darkness = (1 - daylight) * 0.55;
-    let tint = 0x00040a;
-    if (weather === "cold") tint = 0x001428;
-    else if (weather === "drought") tint = 0x1a1204;
-    else if (weather === "rain") tint = 0x03121e;
+    // Dawn ~0.25, dusk ~0.75: a golden-hour band where the sun is low.
+    const goldenDawn = Math.max(0, 1 - Math.abs(timeOfDay - 0.25) / 0.12);
+    const goldenDusk = Math.max(0, 1 - Math.abs(timeOfDay - 0.78) / 0.12);
+    const golden = Math.max(goldenDawn, goldenDusk);
+
+    let tint = 0x02060f; // night: deep cool blue
+    let darkness = (1 - daylight) * 0.62;
+    if (golden > 0.05 && daylight > 0.02) {
+      tint = 0x2a160a; // warm amber wash at golden hour
+      darkness = Math.max(darkness, golden * 0.32);
+    }
+    if (weather === "cold") tint = 0x0a1c30;
+    else if (weather === "drought") tint = 0x241708;
+    else if (weather === "rain") tint = 0x08131f;
+
     this.nightOverlay.clear();
-    this.nightOverlay
-      .rect(0, 0, this.viewW, this.viewH)
-      .fill({ color: tint, alpha: darkness });
+    this.nightOverlay.rect(0, 0, this.viewW, this.viewH).fill({ color: tint, alpha: darkness });
+  }
+
+  /** Subtle, cheap water shimmer: a handful of soft specular glints on the
+   * water surface, breathing in and out on their own phase. Dampened to
+   * nothing under prefers-reduced-motion. */
+  private animateWater(dtMs: number) {
+    const g = this.waterShimmer;
+    const t = this.terrain;
+    if (!g || !t || MOTION_AMP === 0) return;
+    this.shimmerTime += dtMs * 0.001;
+    g.clear();
+    for (const p of t.water) {
+      const a = 0.06 + 0.12 * (0.5 + 0.5 * Math.sin(this.shimmerTime * 1.4 + p.phase));
+      const sway = Math.sin(this.shimmerTime * 0.8 + p.phase) * 3;
+      g.ellipse(p.x + sway, p.y, p.size, p.size * 0.4).fill({ color: 0x9fdfff, alpha: a });
+    }
   }
 
   private renderTick = (ticker: Ticker) => {
     this.frameTime += ticker.deltaMS;
     const t = Math.min(1, this.frameTime / this.simFrameInterval);
+
+    this.animateWater(ticker.deltaMS);
 
     // Camera follow.
     if (this.cameraFollowId != null) {
@@ -333,6 +398,7 @@ const MOTION_AMP = REDUCED_MOTION ? 0 : 1;
 class OrganismSprite {
   glow: Graphics;
   body: Graphics;
+  shadow: Graphics;
   data: RenderOrganism;
   renderX = 0;
   renderY = 0;
@@ -343,6 +409,7 @@ class OrganismSprite {
     this.data = data;
     this.glow = new Graphics();
     this.body = new Graphics();
+    this.shadow = new Graphics();
     this.phase = (data.id % 100) * 0.37;
     this.redraw();
   }
@@ -374,46 +441,113 @@ class OrganismSprite {
 
   private redraw() {
     const d = this.data;
-    const color = this.hueToRgb(d.hue, 0.7, 0.6);
-    const dark = this.hueToRgb(d.hue, 0.8, 0.35);
-    const radius = 4 + d.size * 6;
+    const color = this.hueToRgb(d.hue, 0.7, 0.62);
+    const dark = this.hueToRgb(d.hue, 0.85, 0.32);
+    const light = this.hueToRgb(d.hue, 0.6, 0.78);
+    const radius = 5 + d.size * 7;
     this.body.clear();
     this.glow.clear();
+    this.shadow.clear();
+
+    // Soft contact shadow (drawn unrotated in shadowLayer) grounds the
+    // organism on the terrain so it doesn't read as a floating sticker.
+    const shR = radius * (d.species === 0 ? 0.9 : 1.15);
+    this.shadow.ellipse(0, 0, shR, shR * 0.42).fill({ color: 0x03060a, alpha: 0.32 });
 
     if (d.species === 0) {
-      // Plant: cluster of soft blades / seed pod.
-      const blades = 4 + Math.floor(d.proportion * 3);
-      for (let i = 0; i < blades; i++) {
-        const a = (i / blades) * Math.PI * 2;
-        const len = radius * (1.2 + d.proportion);
-        this.body
-          .moveTo(0, 0)
-          .lineTo(Math.cos(a) * len * 0.4, Math.sin(a) * len)
-          .stroke({ color, width: 1.5, alpha: 0.8 });
+      // Plant: layered foliage rosette with a seed core.
+      const blades = 5 + Math.floor(d.proportion * 4);
+      for (let ring = 0; ring < 2; ring++) {
+        const len = radius * (1.0 + d.proportion * 0.9) * (ring === 0 ? 1 : 0.6);
+        const rot = ring * 0.4;
+        for (let i = 0; i < blades; i++) {
+          const a = (i / blades) * Math.PI * 2 + rot;
+          this.body
+            .moveTo(0, 0)
+            .quadraticCurveTo(
+              Math.cos(a - 0.15) * len * 0.5,
+              Math.sin(a - 0.15) * len * 0.5,
+              Math.cos(a) * len * 0.42,
+              Math.sin(a) * len,
+            )
+            .stroke({ color: ring === 0 ? dark : color, width: 2, alpha: 0.85 });
+        }
       }
-      this.body.circle(0, 0, radius * 0.7).fill({ color: dark, alpha: 0.9 });
-      this.body.circle(0, 0, radius * 0.4).fill({ color, alpha: 0.9 });
-      this.glow.circle(0, 0, radius * 1.6).fill({ color, alpha: 0.18 });
+      this.body.circle(0, 0, radius * 0.55).fill({ color: dark, alpha: 0.95 });
+      this.body.circle(-radius * 0.12, -radius * 0.12, radius * 0.3).fill({ color: light, alpha: 0.9 });
+      this.glow.circle(0, 0, radius * 1.5).fill({ color, alpha: 0.16 });
     } else if (d.species === 1) {
-      // Herbivore: rounded body with trailing cilia.
-      this.body.ellipse(0, 0, radius * 1.2, radius).fill({ color: dark, alpha: 0.95 });
-      this.body.ellipse(0, 0, radius * 0.7, radius * 0.55).fill({ color, alpha: 0.9 });
-      // eye spot
-      this.body.circle(radius * 0.5, 0, radius * 0.22).fill({ color: 0xffffff, alpha: 0.85 });
-      this.glow.circle(0, 0, radius * 2).fill({ color, alpha: 0.22 });
-    } else {
-      // Predator: angular, spiked body.
-      const spikes = 5 + Math.floor(d.proportion * 3);
-      this.body.moveTo(radius * 1.6, 0);
-      for (let i = 1; i <= spikes; i++) {
-        const a = (i / spikes) * Math.PI * 2;
-        const r = i % 2 === 0 ? radius * 1.6 : radius * 0.9;
-        this.body.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+      // Herbivore: streamlined body with a distinct head, paired fins/legs,
+      // and a tapering tail — reads as a small foraging animal, not a blob.
+      const bodyLen = radius * 1.5;
+      // fins/legs (behind body)
+      const limbs = 2 + Math.floor(d.proportion * 2);
+      for (let i = 0; i < limbs; i++) {
+        const along = -bodyLen * 0.3 - i * radius * 0.5;
+        for (const side of [-1, 1]) {
+          this.body
+            .moveTo(along, side * radius * 0.5)
+            .quadraticCurveTo(along - radius * 0.4, side * radius * 1.1, along - radius * 0.7, side * radius * 0.9)
+            .stroke({ color: dark, width: 2, alpha: 0.75 });
+        }
       }
-      this.body.fill({ color: dark, alpha: 0.95 });
-      this.body.circle(0, 0, radius * 0.6).fill({ color, alpha: 0.95 });
-      this.body.circle(radius * 0.3, 0, radius * 0.18).fill({ color: 0xffe0e0, alpha: 0.9 });
-      this.glow.circle(0, 0, radius * 2.2).fill({ color, alpha: 0.26 });
+      // tail
+      this.body
+        .moveTo(-bodyLen * 0.7, 0)
+        .lineTo(-bodyLen * 1.15, -radius * 0.4)
+        .lineTo(-bodyLen * 1.15, radius * 0.4)
+        .fill({ color: dark, alpha: 0.85 });
+      // main body
+      this.body.ellipse(0, 0, bodyLen, radius * 0.85).fill({ color: dark, alpha: 0.96 });
+      this.body.ellipse(radius * 0.1, -radius * 0.15, bodyLen * 0.7, radius * 0.5).fill({ color, alpha: 0.9 });
+      // head
+      this.body.circle(bodyLen * 0.72, 0, radius * 0.62).fill({ color, alpha: 0.95 });
+      this.body.circle(bodyLen * 0.62, -radius * 0.18, radius * 0.28).fill({ color: light, alpha: 0.7 });
+      // eye
+      this.body.circle(bodyLen * 0.85, -radius * 0.12, radius * 0.16).fill({ color: 0x05100a, alpha: 0.9 });
+      this.body.circle(bodyLen * 0.88, -radius * 0.16, radius * 0.06).fill({ color: 0xffffff, alpha: 0.9 });
+      this.glow.circle(0, 0, radius * 1.9).fill({ color, alpha: 0.2 });
+    } else {
+      // Predator: sleek hunter with a pointed jaw, dorsal spines, and a
+      // powerful tail — an unmistakably different silhouette from prey.
+      const bodyLen = radius * 1.7;
+      // dorsal spines
+      const spikes = 3 + Math.floor(d.proportion * 3);
+      for (let i = 0; i < spikes; i++) {
+        const along = bodyLen * 0.3 - (i / spikes) * bodyLen * 1.1;
+        this.body
+          .moveTo(along, -radius * 0.4)
+          .lineTo(along + radius * 0.2, -radius * 1.15)
+          .lineTo(along + radius * 0.45, -radius * 0.4)
+          .fill({ color: dark, alpha: 0.9 });
+      }
+      // tail
+      this.body
+        .moveTo(-bodyLen * 0.75, 0)
+        .quadraticCurveTo(-bodyLen * 1.2, -radius * 0.7, -bodyLen * 1.3, -radius * 0.2)
+        .quadraticCurveTo(-bodyLen * 1.1, 0, -bodyLen * 1.3, radius * 0.2)
+        .quadraticCurveTo(-bodyLen * 1.2, radius * 0.7, -bodyLen * 0.75, 0)
+        .fill({ color: dark, alpha: 0.9 });
+      // body
+      this.body
+        .moveTo(bodyLen * 1.05, 0)
+        .quadraticCurveTo(bodyLen * 0.3, -radius, -bodyLen * 0.75, 0)
+        .quadraticCurveTo(bodyLen * 0.3, radius, bodyLen * 1.05, 0)
+        .fill({ color: dark, alpha: 0.96 });
+      this.body
+        .moveTo(bodyLen * 0.9, 0)
+        .quadraticCurveTo(bodyLen * 0.2, -radius * 0.55, -bodyLen * 0.4, 0)
+        .quadraticCurveTo(bodyLen * 0.2, radius * 0.55, bodyLen * 0.9, 0)
+        .fill({ color, alpha: 0.85 });
+      // jaw + eye
+      this.body
+        .moveTo(bodyLen * 1.05, 0)
+        .lineTo(bodyLen * 0.7, -radius * 0.28)
+        .lineTo(bodyLen * 0.7, radius * 0.28)
+        .fill({ color: light, alpha: 0.5 });
+      this.body.circle(bodyLen * 0.6, -radius * 0.22, radius * 0.16).fill({ color: 0xffe0e0, alpha: 0.95 });
+      this.body.circle(bodyLen * 0.6, -radius * 0.22, radius * 0.07).fill({ color: 0x300000, alpha: 0.95 });
+      this.glow.circle(0, 0, radius * 2.1).fill({ color, alpha: 0.24 });
     }
     this.lastRedrawKey = `${Math.round(d.hue)}:${d.size.toFixed(2)}:${d.species}:${d.proportion.toFixed(2)}`;
   }
@@ -427,8 +561,12 @@ class OrganismSprite {
     const key = `${Math.round(this.data.hue)}:${this.data.size.toFixed(2)}:${this.data.species}:${this.data.proportion.toFixed(2)}`;
     if (key !== this.lastRedrawKey) this.redraw();
 
+    const radius = 5 + this.data.size * 7;
     this.body.position.set(x, y);
     this.glow.position.set(x, y);
+    // Shadow sits slightly below the body and never rotates, so motion reads
+    // as the creature moving over the ground rather than the ground with it.
+    this.shadow.position.set(x, y + radius * 0.5);
 
     // Rotate toward velocity for mobile creatures.
     if (this.data.species !== 0) {
@@ -436,11 +574,18 @@ class OrganismSprite {
       if (speed > 0.05) {
         const targetRot = Math.atan2(this.data.vy, this.data.vx);
         this.body.rotation = targetRot;
+        // Keep the creature upright (belly-down) rather than flipping upside
+        // down when it swims/walks leftward.
+        this.body.scale.y = Math.cos(targetRot) < 0 ? -1 : 1;
       }
-      // Pulse glow with energy + subtle idle breathing.
+      // Gentle "swim/step" bob perpendicular to travel + glow breathing.
+      const gait = Math.sin(this.phase * 3) * 0.06 * MOTION_AMP;
+      this.body.scale.x = 1 + gait;
       const pulse = 0.85 + Math.sin(this.phase) * 0.12 * MOTION_AMP;
       const energyScale = 0.6 + this.data.energyFrac * 0.6;
       this.glow.scale.set(pulse * energyScale);
+      // Shadow shrinks a touch on the up-beat of the gait for liveliness.
+      this.shadow.scale.set(1 - Math.abs(gait) * 0.8);
     } else {
       const sway = 1 + Math.sin(this.phase) * 0.05 * MOTION_AMP;
       this.body.scale.set(sway);
@@ -458,5 +603,6 @@ class OrganismSprite {
   destroy() {
     this.glow.destroy();
     this.body.destroy();
+    this.shadow.destroy();
   }
 }

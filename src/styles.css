@@ -77,6 +77,22 @@ body {
   border-left: 1px solid var(--border);
   border-right: 1px solid var(--border);
 }
+/* Soft cinematic vignette over the habitat — cheap (a static CSS gradient),
+   sits above the canvas but below the HUD overlays, and never intercepts
+   pointer events so click-to-select still works. */
+.stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  background: radial-gradient(
+    ellipse 75% 75% at 50% 45%,
+    transparent 55%,
+    rgba(0, 2, 6, 0.28) 88%,
+    rgba(0, 1, 4, 0.5) 100%
+  );
+}
 .stage canvas {
   display: block;
   width: 100%;
@@ -94,6 +110,7 @@ body {
   align-items: center;
   pointer-events: none;
   flex-wrap: wrap;
+  z-index: 3;
 }
 
 .hud-chip {
@@ -152,6 +169,7 @@ body {
   border: 1px solid var(--border);
   pointer-events: none;
   letter-spacing: 0.04em;
+  z-index: 3;
 }
 
 /* ---- Panels ---- */
