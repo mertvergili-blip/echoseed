@@ -64,6 +64,49 @@ describe("deterministic seed", () => {
     expect(run()).toBe(run());
   });
 
+  it("stays byte-identical across a long run with interventions, checked at multiple tick checkpoints", () => {
+    // Full serialized-snapshot comparison (not just position/energy), sorted
+    // by id for order-independence, checked at several points across an
+    // 8000-tick run. This is a stronger determinism guarantee than the
+    // short-run tests above: genome, health, action, and RNG state must all
+    // match exactly at every checkpoint, not just at the very end.
+    const fullHash = (w: World) => {
+      const snap = w.snapshot();
+      const orgs = snap.organisms
+        .slice()
+        .sort((x, y) => x.id - y.id)
+        .map(
+          (o) =>
+            `${o.id},${o.species},${o.generation},${o.pos.x.toFixed(6)},${o.pos.y.toFixed(6)},` +
+            `${o.energy.toFixed(6)},${o.health.toFixed(6)},${o.action},${JSON.stringify(o.genome)}`,
+        )
+        .join("|");
+      return `t${snap.tick};rng${snap.rngState.join(",")};next${snap.nextId};${orgs}`;
+    };
+
+    const runWithCheckpoints = () => {
+      const w = new World("checkpoint-determinism");
+      const checkpoints = [500, 1500, 3000, 5000, 8000];
+      const hashes: string[] = [];
+      for (let i = 1; i <= 8000; i++) {
+        if (i === 800) w.applyIntervention({ type: "addPredator" });
+        if (i === 2200) w.applyIntervention({ type: "rain", value: 300 });
+        if (i === 4000) w.applyIntervention({ type: "drought", value: 300 });
+        if (i === 6000) w.applyIntervention({ type: "addFood", x: 200, y: 200, value: 5 });
+        w.step();
+        if (checkpoints.includes(i)) hashes.push(fullHash(w));
+      }
+      return hashes;
+    };
+
+    const a = runWithCheckpoints();
+    const b = runWithCheckpoints();
+    expect(a.length).toBe(5);
+    for (let i = 0; i < a.length; i++) {
+      expect(a[i]).toBe(b[i]);
+    }
+  });
+
   it("different seeds diverge", () => {
     const a = new World("seed-a");
     const b = new World("seed-b");
@@ -264,6 +307,47 @@ describe("no NaN in population", () => {
           expect(Number.isFinite(o.health)).toBe(true);
           for (const k in o.genome) expect(Number.isFinite((o.genome as any)[k])).toBe(true);
         }
+      }
+    }
+  });
+});
+
+describe("population balance", () => {
+  // Regression guard for the trophic-cascade bug found during audit: plants
+  // used to eat the entire carrying capacity, starving herbivores, which then
+  // starved predators — collapsing 2/20 sampled seeds to zero mobile life and
+  // driving predators extinct in 11/20. After tuning (flocking cohesion so
+  // `sociability` drives real mate-seeking, a plant population cap, and a
+  // viable predator hunting economy), a large majority of seeds should sustain
+  // multi-species coexistence over a long horizon. This does not require every
+  // seed to stay stable — real predator/prey dynamics can go locally extinct —
+  // but total collapse (zero mobile life) must stay rare.
+  it("most seeds sustain multi-species life over 6000 ticks; total collapse stays rare", () => {
+    const seeds = Array.from({ length: 10 }, (_, i) => `balance-check-${i}`);
+    let collapsed = 0;
+    let stable = 0;
+    for (const seed of seeds) {
+      const w = new World(seed);
+      for (let i = 0; i < 6000; i++) {
+        if (i > 0 && i % 3000 === 0) w.applyIntervention({ type: "addFood", value: 6 });
+        w.step();
+      }
+      const herb = w.countSpecies("herbivore");
+      const pred = w.countSpecies("predator");
+      if (herb === 0 && pred === 0) collapsed++;
+      if (herb > 0 && pred > 0) stable++;
+    }
+    expect(collapsed).toBeLessThanOrEqual(1);
+    expect(stable).toBeGreaterThanOrEqual(6);
+  });
+
+  it("plants never exceed their configured share of carrying capacity", () => {
+    const w = new World("plant-cap-check");
+    for (let i = 0; i < 6000; i++) {
+      w.step();
+      if (i % 500 === 0) {
+        const plants = w.countSpecies("plant");
+        expect(plants).toBeLessThanOrEqual(w.env.carryingCapacity * 0.55);
       }
     }
   });

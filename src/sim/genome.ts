@@ -53,7 +53,7 @@ export function randomGenome(rng: Rng, species: "plant" | "herbivore" | "predato
     g.bodySize = rng.range(1.0, 1.7);
     g.visionRadius = rng.range(80, 160);
     g.visualHue = rng.range(340, 380) % 360; // reds/magentas
-    g.metabolism = rng.range(0.9, 1.5);
+    g.metabolism = rng.range(0.75, 1.2);
   } else if (species === "herbivore") {
     g.aggression = rng.range(0, 0.25);
     g.fear = rng.range(0.4, 0.9);

@@ -309,7 +309,7 @@ export class World {
       o.energy >= CONFIG.plantReproEnergy &&
       o.reproCooldown <= 0 &&
       capOk &&
-      plantCount < this.env.carryingCapacity * 0.7 &&
+      plantCount < CONFIG.plantCapFraction * this.env.carryingCapacity &&
       this.rng.chance(CONFIG.plantReproChance * o.genome.fertility * this.env.plantGrowthRate)
     ) {
       const angle = this.rng.range(0, Math.PI * 2);
@@ -379,6 +379,9 @@ export class World {
     let nearestMate: Organism | null = null;
     let nearestMateD = Infinity;
     let sameCount = 0;
+    // Accumulate same-species center of mass for flocking cohesion.
+    let cohX = 0;
+    let cohY = 0;
 
     this.hash.queryRadius(o.pos.x, o.pos.y, vision, (idx) => {
       const other = this.organisms[idx];
@@ -395,6 +398,8 @@ export class World {
           nearestThreat = other;
         } else if (other.species === "herbivore") {
           sameCount++;
+          cohX += other.pos.x;
+          cohY += other.pos.y;
           if (
             other.reproCooldown <= 0 &&
             o.reproCooldown <= 0 &&
@@ -410,6 +415,8 @@ export class World {
           nearestPrey = other;
         } else if (other.species === "predator") {
           sameCount++;
+          cohX += other.pos.x;
+          cohY += other.pos.y;
           if (other.reproCooldown <= 0 && o.reproCooldown <= 0 && d < nearestMateD) {
             nearestMateD = d;
             nearestMate = other;
@@ -428,6 +435,7 @@ export class World {
       nearestMate: nearestMate as Organism | null,
       nearestMateD: Math.sqrt(nearestMateD),
       sameCount,
+      cohesion: sameCount > 0 ? { x: cohX / sameCount, y: cohY / sameCount } : null,
     };
   }
 
@@ -588,6 +596,19 @@ export class World {
         const jitter = CONFIG.wanderJitter;
         o.vel.x += this.rng.range(-jitter, jitter);
         o.vel.y += this.rng.range(-jitter, jitter);
+
+        // Flocking cohesion: sociable organisms drift toward same-species
+        // center of mass. This makes `sociability` a measurable behaviour and
+        // raises mating-encounter rates so prey can sustain a breeding base.
+        if (p.cohesion) {
+          const energyFrac = o.energy / o.maxEnergy;
+          // Reproductively-ready organisms seek company harder (to find a mate).
+          const ready = energyFrac >= CONFIG.reproMinEnergyFrac && o.reproCooldown <= 0;
+          const pull = (0.1 + g.sociability * 0.5 + (ready ? 0.5 : 0)) * CONFIG.cohesionStrength;
+          o.vel.x += (p.cohesion.x - o.pos.x) * pull;
+          o.vel.y += (p.cohesion.y - o.pos.y) * pull;
+        }
+
         const sp = Math.hypot(o.vel.x, o.vel.y) || 1;
         const cap = speed * 0.6;
         if (sp > cap) {

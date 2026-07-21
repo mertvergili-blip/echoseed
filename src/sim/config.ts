@@ -16,11 +16,11 @@ export const CONFIG = {
   baseMetabolicCost: 0.02,
   moveCostFactor: 0.015,
   plantEnergyValue: 32,
-  preyEnergyGain: 0.6, // fraction of prey energy gained on kill
+  preyEnergyGain: 0.75, // fraction of prey energy gained on kill
   eatRadius: 12,
-  attackRadius: 16,
-  attackDamage: 14,
-  attackCooldownTicks: 20,
+  attackRadius: 20,
+  attackDamage: 22,
+  attackCooldownTicks: 14,
 
   // Plant dynamics
   plantSeedEnergy: 20,
@@ -29,18 +29,20 @@ export const CONFIG = {
   plantReproEnergy: 45,
   plantReproChance: 0.004,
   plantSpreadRadius: 60,
+  plantCapFraction: 0.5, // plants may fill at most this fraction of carrying capacity
 
   // Reproduction
-  reproMinEnergyFrac: 0.6, // must have >= this fraction of maxEnergy
-  reproCostFrac: 0.35,
-  reproCooldownTicks: 300,
-  matingRadius: 24,
+  reproMinEnergyFrac: 0.5, // must have >= this fraction of maxEnergy
+  reproCostFrac: 0.32,
+  reproCooldownTicks: 220,
+  matingRadius: 30,
   gestationInstant: true,
 
   // Movement
   maxSpeedBase: 1.4,
   wanderJitter: 0.35,
   fleeMultiplier: 1.4,
+  cohesionStrength: 0.01, // flocking pull toward same-species center (× sociability)
 
   // Environment
   droughtMoisture: 0.12,
