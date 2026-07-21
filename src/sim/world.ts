@@ -257,6 +257,7 @@ export class World {
 
     // Remove the dead lazily to keep indices stable during the loop.
     if (this.tick % 30 === 0) this.compact();
+    if (this.tick % 600 === 0) this.trimLineage();
 
     if (this.tick % CONFIG.historyInterval === 0) this.sample();
     this.maybeAutoAscend();
@@ -769,6 +770,21 @@ export class World {
     this.organisms.length = w;
   }
 
+  /**
+   * Bound the live lineage log and its id index. Without this, a long play
+   * session (hours of continuous births) grows `lineage`/`lineageById`
+   * without limit — snapshot() already trims to the most recent 2000
+   * entries for saves, but that only produces a *copy*; the live array
+   * itself was never capped, so memory usage would climb indefinitely over
+   * a long-running session even though nothing ever reads that old history.
+   */
+  private trimLineage(): void {
+    const CAP = 4000;
+    if (this.lineage.length <= CAP) return;
+    const removed = this.lineage.splice(0, this.lineage.length - CAP);
+    for (const n of removed) this.lineageById.delete(n.id);
+  }
+
   // ---- Analytics ------------------------------------------------------------
 
   countSpecies(s: Species): number {
@@ -806,16 +822,20 @@ export class World {
   /** Average genome across living non-plant organisms (dominant traits). */
   dominantTraits(): Partial<Genome> | null {
     let n = 0;
-    const acc: Record<string, number> = {};
+    const acc: Partial<Record<keyof Genome, number>> = {};
     for (const o of this.organisms) {
       if (!o.alive || o.species === "plant") continue;
       n++;
-      for (const k in o.genome) acc[k] = (acc[k] ?? 0) + (o.genome as any)[k];
+      for (const k of Object.keys(o.genome) as (keyof Genome)[]) {
+        acc[k] = (acc[k] ?? 0) + o.genome[k];
+      }
     }
     if (!n) return null;
-    const out: Record<string, number> = {};
-    for (const k in acc) out[k] = acc[k] / n;
-    return out as Partial<Genome>;
+    const out: Partial<Record<keyof Genome, number>> = {};
+    for (const k of Object.keys(acc) as (keyof Genome)[]) {
+      out[k] = acc[k]! / n;
+    }
+    return out;
   }
 
   private maybeAutoAscend(): void {

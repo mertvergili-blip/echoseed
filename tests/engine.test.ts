@@ -390,6 +390,33 @@ describe("no NaN in population", () => {
   });
 });
 
+describe("lineage memory bound", () => {
+  // Regression guard: World.lineage/lineageById used to grow without limit
+  // during live simulation — only World.snapshot() trimmed to the most
+  // recent 2000 entries, but that produced a copy for saves and never
+  // capped the live arrays themselves, so memory usage would climb
+  // indefinitely over a long play session even though nothing reads that
+  // old history.
+  it("caps the live lineage log instead of growing unboundedly", () => {
+    const w = new World("lineage-cap-check") as unknown as {
+      lineage: unknown[];
+      lineageById: Map<number, unknown>;
+      trimLineage: () => void;
+    };
+    for (let i = 0; i < 5000; i++) {
+      const node = { id: i, species: "plant", generation: 0, parentIds: null, bornTick: 0, diedTick: null, offspring: 0 };
+      w.lineage.push(node);
+      w.lineageById.set(i, node);
+    }
+    w.trimLineage();
+    expect(w.lineage.length).toBeLessThanOrEqual(4000);
+    expect(w.lineage.length).toBe(w.lineageById.size);
+    // Most recent entries survive, oldest are dropped from both structures.
+    expect(w.lineageById.has(4999)).toBe(true);
+    expect(w.lineageById.has(0)).toBe(false);
+  });
+});
+
 describe("population balance", () => {
   // Regression guard for the trophic-cascade bug found during audit: plants
   // used to eat the entire carrying capacity, starving herbivores, which then
