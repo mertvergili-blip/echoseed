@@ -79,6 +79,13 @@ test("temperature slider changes the displayed temperature", async ({ trackedPag
 test("add food increases plant population", async ({ trackedPage: page }) => {
   await page.goto("/");
   await waitForTickAdvance(page, 1, 10000);
+  // Pause first: interventions apply immediately regardless of pause state
+  // (the worker calls applyIntervention() outside the step loop), but
+  // leaving the sim running gives herbivores time to eat plants faster than
+  // this adds them on some seeds/moments, which intermittently made the
+  // population go down instead of up even though the food was added.
+  // Pausing removes that race without weakening what's actually verified.
+  await page.getByText("❚❚ Pause", { exact: true }).click();
   const before = await speciesCounts(page);
   await page.getByRole("button", { name: "Add Food" }).click();
   await expect
