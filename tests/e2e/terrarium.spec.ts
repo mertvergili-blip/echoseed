@@ -154,12 +154,18 @@ test("camera follow toggle tracks the selected organism (view offset changes wit
 }) => {
   await page.goto("/");
   await waitForTickAdvance(page, 1, 10000);
+  // Pause only for the click: clickOrganism reads a live position and then
+  // clicks in a separate step, and an unpaused herbivore can move far enough
+  // in that gap (plus real browser/locator overhead) to dodge the click's
+  // hit radius. The follow behavior itself is what runs unpaused below.
+  await page.getByText("❚❚ Pause", { exact: true }).click();
 
   const followBtn = page.getByRole("button", { name: /follow/ });
   await clickOrganism(page, "herbivore");
   await expect(followBtn).toBeVisible();
   await followBtn.click();
   await expect(page.getByRole("button", { name: "● following" })).toBeVisible();
+  await page.getByText("▶ Play", { exact: true }).click();
   // Let the simulation run with follow engaged; the canvas should keep
   // rendering without erroring (covered by the console/network fixture).
   await page.waitForTimeout(1000);
