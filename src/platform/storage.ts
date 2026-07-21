@@ -4,9 +4,25 @@
  */
 
 const KEY = "echoseed-save";
+/** Exported for tests that need to poke the underlying storage directly. */
+export const STORAGE_KEY = KEY;
+
+/**
+ * Distinguishes "nothing has ever been saved" (first launch — no warning
+ * needed) from "a save exists but couldn't be read" (corruption — the
+ * caller must tell the user, not silently start a fresh world as if nothing
+ * happened). Collapsing these into a single `null`/falsy result was a real
+ * bug: a truncated or hand-edited save file used to look identical to a
+ * first launch, so the app would quietly start over with no indication the
+ * previous world was lost.
+ */
+export type LoadOutcome =
+  | { status: "empty" }
+  | { status: "corrupt" }
+  | { status: "ok"; data: unknown };
 
 interface StorageBackend {
-  get(): Promise<unknown>;
+  get(): Promise<LoadOutcome>;
   set(value: unknown): Promise<void>;
   clear(): Promise<void>;
 }
@@ -16,12 +32,20 @@ function isTauri(): boolean {
 }
 
 class LocalStorageBackend implements StorageBackend {
-  async get(): Promise<unknown> {
+  async get(): Promise<LoadOutcome> {
+    let raw: string | null;
     try {
-      const raw = localStorage.getItem(KEY);
-      return raw ? JSON.parse(raw) : null;
+      raw = localStorage.getItem(KEY);
     } catch {
-      return null;
+      // Storage itself is inaccessible (disabled, sandboxed, etc.) — there is
+      // nothing to recover, so this is equivalent to a first launch.
+      return { status: "empty" };
+    }
+    if (!raw) return { status: "empty" };
+    try {
+      return { status: "ok", data: JSON.parse(raw) };
+    } catch {
+      return { status: "corrupt" };
     }
   }
   async set(value: unknown): Promise<void> {
@@ -50,13 +74,22 @@ class TauriStoreBackend implements StorageBackend {
     return this.storePromise;
   }
 
-  async get(): Promise<unknown> {
+  async get(): Promise<LoadOutcome> {
     try {
       const s = await this.store();
-      return (await s.get(KEY)) ?? null;
+      const data = await s.get(KEY);
+      if (data === undefined || data === null) return { status: "empty" };
+      return { status: "ok", data };
     } catch (e) {
       console.warn("Tauri store get failed, falling back", e);
-      return new LocalStorageBackend().get();
+      // The store file itself may be unreadable (e.g. truncated by an
+      // unclean shutdown mid-write). We can't tell that apart from "no store
+      // file yet" through this API, so try the localStorage fallback; if
+      // that's also empty we still can't be sure nothing was lost, so we
+      // conservatively report "corrupt" rather than assuming a first launch.
+      const fallback = await new LocalStorageBackend().get();
+      if (fallback.status === "ok") return fallback;
+      return { status: "corrupt" };
     }
   }
   async set(value: unknown): Promise<void> {
@@ -83,7 +116,7 @@ class TauriStoreBackend implements StorageBackend {
 const backend: StorageBackend = isTauri() ? new TauriStoreBackend() : new LocalStorageBackend();
 
 export const storage = {
-  load: () => backend.get(),
+  load: (): Promise<LoadOutcome> => backend.get(),
   save: (value: unknown) => backend.set(value),
   clear: () => backend.clear(),
   isTauri,

@@ -1,7 +1,7 @@
 import { StrictMode, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { storage } from "./platform/storage";
-import { loadSave, randomSeed, DEFAULT_CREATURE, type CreatureState } from "./sim/save";
+import { loadSave, makeSave, randomSeed, DEFAULT_CREATURE, type CreatureState } from "./sim/save";
 import { randomGenome } from "./sim/genome";
 import { Rng } from "./sim/rng";
 import { CreatureEngine } from "./creature/creatureEngine";
@@ -30,11 +30,15 @@ function CreatureApp() {
     let disposed = false;
 
     (async () => {
-      const raw = await storage.load();
+      const outcome = await storage.load();
       let genome: Genome;
       let cstate: CreatureState;
-      if (raw) {
-        const res = loadSave(raw);
+      if (outcome.status !== "empty") {
+        // loadSave safely falls back to a fresh world on "corrupt" data too
+        // (same guarantee the terrarium window relies on) — the corrupt case
+        // is surfaced to the player from the terrarium window's toast, since
+        // this standalone creature window has no UI for it.
+        const res = loadSave(outcome.status === "ok" ? outcome.data : null);
         cstate = res.creature;
         const w = res.world;
         const asc = w.ascendedId != null ? w.getById(w.ascendedId) : null;
@@ -78,11 +82,7 @@ function CreatureApp() {
     const saveState = async () => {
       const engine = engineRef.current;
       if (!engine) return;
-      const raw = await storage.load();
-      if (raw && typeof raw === "object") {
-        (raw as any).creature = engine.state;
-        await storage.save(raw);
-      }
+      await mergeCreatureState(engine.state);
     };
     const saveTimer = setInterval(saveState, 8000);
     const onUnload = () => void saveState();
@@ -221,12 +221,25 @@ function CreatureApp() {
   );
 }
 
+/**
+ * Merge an updated creature state into the existing save without disturbing
+ * the rest of it. Always routes through loadSave()/makeSave() rather than
+ * blindly mutating whatever was on disk — that would "launder" a corrupt or
+ * malformed save back into looking legitimate while leaving its world data
+ * untouched and unvalidated. If the existing save is corrupt, this
+ * self-heals it into a valid save (fresh world + the creature's current
+ * state) instead of leaving an unreadable file that fails every future load.
+ */
+async function mergeCreatureState(state: CreatureState): Promise<void> {
+  const outcome = await storage.load();
+  if (outcome.status === "empty") return; // nothing to merge into yet
+  const result = loadSave(outcome.status === "ok" ? outcome.data : null);
+  const save = makeSave(result.world, result.settings, state);
+  await storage.save(save);
+}
+
 async function persistAndReturn(state: CreatureState) {
-  const raw = await storage.load();
-  if (raw && typeof raw === "object") {
-    (raw as any).creature = state;
-    await storage.save(raw);
-  }
+  await mergeCreatureState(state);
   if (isTauriRuntime()) {
     try {
       const { getCurrentWindow } = await import("@tauri-apps/api/window");

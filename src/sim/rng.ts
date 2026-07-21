@@ -75,7 +75,13 @@ export class Rng {
 
   /** Serializable internal state, for exact save/load resume. */
   getState(): [number, number, number, number] {
-    return [this.a, this.b, this.c, this.d];
+    // Normalize to unsigned 32-bit: internal ops use raw JS bitwise
+    // operators, which return signed results, so this.a/b/c/d can hold
+    // negative representations of what are conceptually unsigned words.
+    // setState() already normalizes on the way in; normalizing here too
+    // keeps saved state consistently non-negative and makes getState()
+    // idempotent under a save/load round trip.
+    return [this.a >>> 0, this.b >>> 0, this.c >>> 0, this.d >>> 0];
   }
 
   setState(s: [number, number, number, number]): void {

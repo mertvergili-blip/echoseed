@@ -99,10 +99,18 @@ export function App() {
       if (canvasRef.current && stageRef.current) {
         await renderer.init(canvasRef.current, stageRef.current);
       }
-      // Load persisted save or start fresh.
-      const raw = await storage.load();
-      if (raw) {
-        const result = loadSave(raw);
+      // Load persisted save or start fresh. `outcome.status` distinguishes a
+      // genuine first launch ("empty") from a save that exists but could not
+      // even be parsed ("corrupt") — the latter must never look like a fresh
+      // start to the player without an explanation.
+      const outcome = await storage.load();
+      if (outcome.status === "empty") {
+        const s = randomSeed();
+        setSeed(s);
+        client.init(s);
+        addLog(0, `new world seeded: ${s}`);
+      } else {
+        const result = loadSave(outcome.status === "ok" ? outcome.data : null);
         setSeed(result.world.seed);
         setSpeed(result.settings.simSpeed);
         setPaused(result.settings.paused);
@@ -111,17 +119,15 @@ export function App() {
         client.loadSnapshot(result.world.snapshot());
         client.setSpeed(result.settings.simSpeed);
         client.pause(result.settings.paused);
-        if (result.recovered) {
+        if (outcome.status === "corrupt") {
+          showToast("Save file was unreadable — started a fresh world (your old save could not be recovered)");
+          addLog(0, "save file corrupt: started fresh");
+        } else if (result.recovered) {
           showToast(`Save recovered — started fresh (${result.reason ?? "corrupt"})`);
           addLog(0, `save recovered: ${result.reason}`);
         } else {
           addLog(result.world.tick, `world loaded @ tick ${result.world.tick}`);
         }
-      } else {
-        const s = randomSeed();
-        setSeed(s);
-        client.init(s);
-        addLog(0, `new world seeded: ${s}`);
       }
     })();
 

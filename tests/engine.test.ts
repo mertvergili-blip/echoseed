@@ -289,14 +289,85 @@ describe("corrupted save fallback", () => {
     }
   });
 
-  it("falls back when organisms contain NaN", () => {
+  it("repairs a single bad field instead of discarding the whole save", () => {
+    // A save is much more valuable to the player than a single organism's
+    // exact position. One corrupted field on one organism should not cost
+    // the entire world — the sanitizer clamps/defaults the bad field and
+    // keeps everything else (this is a stronger guarantee than the naive
+    // "any invalid field triggers a full fallback" behavior it replaced).
     const w = new World("corrupt");
+    for (let i = 0; i < 10; i++) w.step();
+    const aliveCountBefore = w.organisms.filter((o) => o.alive).length;
+    const save = makeSave(w, DEFAULT_SETTINGS, DEFAULT_CREATURE);
+    const json: any = JSON.parse(JSON.stringify(save));
+    const victimId = json.world.organisms[0].id;
+    json.world.organisms[0].pos.x = "NaN-not-a-number";
+
+    const r = loadSave(json);
+    expect(r.ok).toBe(true);
+    expect(r.recovered).toBe(false);
+    // Every organism, including the one with the corrupted field, survives.
+    expect(r.world.organisms.length).toBe(aliveCountBefore);
+    const repaired = r.world.getById(victimId)!;
+    expect(repaired).toBeTruthy();
+    expect(Number.isFinite(repaired.pos.x)).toBe(true);
+    expect(repaired.pos.x).toBeGreaterThanOrEqual(0);
+  });
+
+  it("drops only organisms with unrecoverable identity (missing/duplicate id or bad species), keeps the rest", () => {
+    const w = new World("corrupt-identity");
     for (let i = 0; i < 10; i++) w.step();
     const save = makeSave(w, DEFAULT_SETTINGS, DEFAULT_CREATURE);
     const json: any = JSON.parse(JSON.stringify(save));
-    json.world.organisms[0].pos.x = "NaN-not-a-number";
+    const totalBefore = json.world.organisms.length;
+    expect(totalBefore).toBeGreaterThan(2);
+
+    delete json.world.organisms[0].id; // unrecoverable
+    json.world.organisms[1].id = json.world.organisms[2].id; // duplicate — second occurrence dropped
+
     const r = loadSave(json);
-    expect(r.recovered).toBe(true);
+    expect(r.ok).toBe(true);
+    expect(r.recovered).toBe(false);
+    expect(r.world.organisms.length).toBe(totalBefore - 2);
+  });
+
+  it("clamps genome values that are out of range or non-finite instead of poisoning the simulation", () => {
+    const w = new World("corrupt-genome");
+    for (let i = 0; i < 10; i++) w.step();
+    const save = makeSave(w, DEFAULT_SETTINGS, DEFAULT_CREATURE);
+    const json: any = JSON.parse(JSON.stringify(save));
+    const victimId = json.world.organisms[0].id;
+    json.world.organisms[0].genome.bodySize = 999999;
+    json.world.organisms[0].genome.fear = Number.NaN;
+    json.world.organisms[0].genome.aggression = -Infinity;
+
+    const r = loadSave(json);
+    expect(r.ok).toBe(true);
+    const repaired = r.world.getById(victimId)!;
+    for (const k in repaired.genome) {
+      expect(Number.isFinite((repaired.genome as any)[k])).toBe(true);
+    }
+    expect(repaired.genome.bodySize).toBeLessThanOrEqual(2);
+
+    // The world must be able to keep running on the repaired data.
+    for (let i = 0; i < 100; i++) r.world.step();
+    for (const o of r.world.organisms) {
+      expect(Number.isFinite(o.energy)).toBe(true);
+      expect(Number.isFinite(o.health)).toBe(true);
+    }
+  });
+
+  it("falls back entirely when the save is too structurally broken to salvage", () => {
+    const cases = [
+      { version: 1, world: { seed: "x", tick: 1, organisms: "not-an-array", rngState: [1, 2, 3, 4], environment: {} } },
+      { version: 1, world: { seed: "x", tick: 1, organisms: [], rngState: [1, 2], environment: {} } },
+      { version: 1, world: { seed: 42, tick: 1, organisms: [], rngState: [1, 2, 3, 4], environment: {} } },
+    ];
+    for (const bad of cases) {
+      const r = loadSave(bad);
+      expect(r.recovered).toBe(true);
+      expect(r.world).toBeInstanceOf(World);
+    }
   });
 });
 
