@@ -27,7 +27,10 @@ Instagram'ı açtığında önce bu sayfa çıkar. Sayfada:
 **"Yine de gir" kilidi:** 10 sn + o gün yaptığın her giriş için +5 sn, en fazla 60 sn.
 
 **Durum etiketleri:** Taze (78+) · Yorgun (55+) · Bulanık (35+) · Çürüyor (15+) · Zombi (15 altı).
-50 altında damlalar, 40 altında sallanma, 30 altında sinekler başlar.
+78 altında çürük lekeleri, 50 altında damlalar, 40 altında sallanma, 30 altında sinekler başlar.
+
+**Seri (🔥):** Bir günü hiç "Yine de gir" demeden kapatırsan ertesi gün seri bir artar.
+Bir kez girersen sıfırlanır.
 
 ---
 
@@ -201,6 +204,19 @@ hepsi bir kez çıkmadan aynısı tekrar etmez.
 
 Küçük görevleri de aynı dosyadaki **`GOREVLER`** dizisinden
 düz metin olarak ekleyip çıkarabilirsin.
+
+## 5.1 Görsel dil
+
+Düz vektör çizgi film: kalın siyah kontur, gradyan yok, kartların altında
+sert gölge, çıkartma gibi konturlu rakamlar. Renkler `:root` içindeki CSS
+değişkenlerinde tek yerde duruyor (`--sky1`, `--ground`, `--green`,
+`--crimson`, `--outline`). Beynin gövde renkleri `C_FRESH` / `C_MID` /
+`C_DEAD` sabitlerinden geliyor; `bodyRGB()` bu üçü arasında geçiş yapıyor.
+
+Beyin karakteri tek bir path değil, birleşen lob elipslerinden kuruluyor
+(`LOBES`). Aynı elips kümesi üç kez çiziliyor: kalın konturlu koyu katman,
+gövde renginde dolgu, bir de kırpma maskesi. Silüeti değiştirmek için
+sadece `LOBES` dizisine dokunman yeterli.
 
 Puanları değiştirmek istersen dosyanın başındaki
 `START_HEALTH`, `COST_VISIT`, `COST_ENTER`, `GAIN_QUIT`, `GAIN_NEW_DAY`,
