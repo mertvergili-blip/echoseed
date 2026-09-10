@@ -205,12 +205,22 @@ hepsi bir kez çıkmadan aynısı tekrar etmez.
 Küçük görevleri de aynı dosyadaki **`GOREVLER`** dizisinden
 düz metin olarak ekleyip çıkarabilirsin.
 
-## 5.1 Görsel dil
+## 5.1 Ekranlar
 
-Düz vektör çizgi film: kalın siyah kontur, gradyan yok, kartların altında
-sert gölge, çıkartma gibi konturlu rakamlar. Renkler `:root` içindeki CSS
-değişkenlerinde tek yerde duruyor (`--sky1`, `--ground`, `--green`,
-`--crimson`, `--outline`). Beynin gövde renkleri `C_FRESH` / `C_MID` /
+Alttaki çubukta üç sekme var, hepsi aynı sayfanın içinde:
+
+- **Beyin** — karakter, sağlık yüzdesi, bugünün üç sayacı, acı gerçek ve iki düğme.
+- **Sayılar** — bugünün ve toplamın dökümü, seri dahil.
+- **Ayarlar** — yaş, günlük ekran saati, sıfırlama.
+
+## 5.2 Görsel dil
+
+Düz vektör çizgi film: kalın siyah kontur, gradyan yok, çıkartma gibi
+konturlu rakamlar. Sayfa kartlara bölünmüyor — üstte açık gökyüzü, altında
+kavisli tek bir zemin var, içerik zeminin üstünde duruyor. Renkler `:root`
+içindeki CSS değişkenlerinde tek yerde duruyor (`--sky`, `--hill`, `--tile`,
+`--green`, `--crimson`, `--outline`). Ufuk çizgisinin yüksekliği `--hillTop`
+değişkeninde; Beyin sekmesinde aşağıda, diğer sekmelerde yukarıda duruyor. Beynin gövde renkleri `C_FRESH` / `C_MID` /
 `C_DEAD` sabitlerinden geliyor; `bodyRGB()` bu üçü arasında geçiş yapıyor.
 
 Beyin karakteri tek bir path değil, birleşen lob elipslerinden kuruluyor
