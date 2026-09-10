@@ -1,0 +1,702 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#E9E1D0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>BEYİN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@400;600;800&family=Big+Shoulders+Text:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bone:#E9E1D0;
+    --paper:#F5EFE3;
+    --ink:#241E1A;
+    --crimson:#8E1420;
+    --graphite:#6E655B;
+    --disp:"Big Shoulders Display","Avenir Next Condensed","Helvetica Neue",sans-serif;
+    --text:"Big Shoulders Text","Avenir Next Condensed","Helvetica Neue",sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bone);
+    color:var(--ink);
+    font-family:var(--text);
+    font-size:16px;
+    line-height:1.25;
+    -webkit-font-smoothing:antialiased;
+    min-height:100svh;
+  }
+  .sheet{
+    max-width:520px;
+    margin:0 auto;
+    padding-block:calc(env(safe-area-inset-top) + 14px) calc(env(safe-area-inset-bottom) + 18px);
+    padding-left:calc(env(safe-area-inset-left) + 18px);
+    padding-right:calc(env(safe-area-inset-right) + 18px);
+  }
+
+  /* ---- kalıp parçası ---- */
+  .piece{
+    position:relative;
+    background:var(--paper);
+    border:1.5px solid var(--ink);
+    padding:22px 16px 16px;
+  }
+  .piece::before{
+    content:"";
+    position:absolute;
+    inset:9px;
+    border:1px dashed var(--graphite);
+    opacity:.65;
+    pointer-events:none;
+  }
+  /* çentikler */
+  .notch{position:absolute;background:var(--ink)}
+  .notch.t1{top:-1.5px;left:26%;width:1.5px;height:11px}
+  .notch.t2{top:-1.5px;left:calc(26% + 7px);width:1.5px;height:11px}
+  .notch.b1{bottom:-1.5px;right:30%;width:1.5px;height:11px}
+  .notch.l1{left:-1.5px;top:44%;width:11px;height:1.5px}
+  .notch.r1{right:-1.5px;top:62%;width:11px;height:1.5px}
+
+  .piece-label{
+    position:absolute;top:-1px;left:22px;
+    transform:translateY(-52%);
+    background:var(--bone);
+    padding:0 7px;
+    font-family:var(--disp);
+    font-weight:800;
+    letter-spacing:.16em;
+    font-size:12px;
+    text-transform:uppercase;
+  }
+  .cut-note{
+    font-family:var(--disp);
+    font-weight:600;
+    letter-spacing:.14em;
+    font-size:11px;
+    text-transform:uppercase;
+    color:var(--graphite);
+    text-align:center;
+    margin:10px 0 0;
+  }
+
+  /* ---- beyin sahnesi ---- */
+  .stage{position:relative;display:flex;justify-content:center;align-items:center;padding:6px 0 0}
+  #brainWrap{width:min(74vw,270px);transform-origin:50% 82%}
+  #brainWrap.sway{animation:sway 2.6s ease-in-out infinite}
+  @keyframes sway{0%,100%{transform:rotate(-2.4deg)}50%{transform:rotate(2.4deg)}}
+  .drip{animation:drip 2.2s linear infinite}
+  @keyframes drip{0%{opacity:0;transform:translateY(0)}12%{opacity:.9}100%{opacity:0;transform:translateY(46px)}}
+  .fly{animation:orbit 3.4s linear infinite;transform-origin:135px 118px}
+  @keyframes orbit{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+  #healFlash{
+    position:absolute;inset:0;border-radius:50%;
+    background:radial-gradient(circle,rgba(255,255,255,.95),rgba(255,255,255,0) 68%);
+    opacity:0;pointer-events:none;
+  }
+  #healFlash.on{animation:heal 1100ms ease-out}
+  @keyframes heal{0%{opacity:0;transform:scale(.6)}25%{opacity:1}100%{opacity:0;transform:scale(1.5)}}
+
+  /* grainline */
+  .grain{display:block;margin:2px auto 0;opacity:.8}
+
+  /* ---- durum ---- */
+  .status{display:flex;align-items:baseline;justify-content:center;gap:10px;margin-top:8px}
+  .status .tag{
+    font-family:var(--disp);font-weight:800;text-transform:uppercase;
+    letter-spacing:.18em;font-size:15px;
+  }
+  .status .hp{font-family:var(--disp);font-weight:800;font-size:40px;color:var(--crimson);line-height:.9}
+  .bar{height:6px;background:#DED5C2;border:1px solid var(--ink);margin-top:9px;position:relative}
+  .bar i{display:block;height:100%;background:var(--crimson);transition:width .6s cubic-bezier(.2,.8,.2,1)}
+
+  /* ---- acı gerçek ---- */
+  .fact{border-top:1.5px solid var(--ink);margin-top:16px;padding-top:12px;text-align:center}
+  .fact .big{
+    font-family:var(--disp);font-weight:800;color:var(--crimson);
+    font-size:clamp(52px,17vw,86px);line-height:.82;letter-spacing:-.02em;
+  }
+  .fact .unit{font-size:.34em;letter-spacing:.14em;text-transform:uppercase;color:var(--ink);display:inline-block;margin-left:6px}
+  .fact p{margin:9px 2px 0;font-size:15.5px;color:var(--ink)}
+  .fact.swap{animation:swap 420ms ease}
+  @keyframes swap{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  /* ---- düğmeler ---- */
+  .acts{display:grid;gap:9px;margin-top:18px}
+  button{
+    font-family:var(--disp);font-weight:800;text-transform:uppercase;letter-spacing:.14em;
+    font-size:17px;padding:15px 12px;border:1.5px solid var(--ink);background:var(--paper);
+    color:var(--ink);cursor:pointer;width:100%;
+  }
+  button:active{transform:translateY(1px)}
+  #quit{background:var(--ink);color:var(--paper)}
+  #enter{color:var(--graphite)}
+  #enter[disabled]{opacity:.55;cursor:not-allowed;border-style:dashed}
+  #enter .cd{color:var(--crimson)}
+
+  .task{
+    margin-top:14px;border:1.5px solid var(--ink);background:var(--paper);
+    padding:14px;display:none;
+  }
+  .task.on{display:block;animation:swap 420ms ease}
+  .task h3{font-family:var(--disp);font-weight:800;letter-spacing:.16em;font-size:12px;
+    text-transform:uppercase;margin:0 0 6px;color:var(--graphite)}
+  .task p{margin:0;font-size:19px;font-family:var(--disp);font-weight:600}
+
+  /* ---- istatistik ---- */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--ink);
+    border:1.5px solid var(--ink);margin-top:16px}
+  .stats div{background:var(--paper);padding:9px 4px;text-align:center}
+  .stats b{display:block;font-family:var(--disp);font-weight:800;font-size:24px;color:var(--crimson);line-height:1}
+  .stats span{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--graphite)}
+
+  /* ---- ayarlar ---- */
+  details{margin-top:16px;border-top:1.5px solid var(--ink);padding-top:10px}
+  summary{font-family:var(--disp);font-weight:600;letter-spacing:.16em;text-transform:uppercase;
+    font-size:11px;color:var(--graphite);cursor:pointer;list-style:none}
+  summary::-webkit-details-marker{display:none}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px}
+  .row label{font-size:14px}
+  .row input{
+    font-family:var(--disp);font-weight:800;font-size:22px;color:var(--crimson);
+    width:92px;text-align:right;background:transparent;border:0;border-bottom:1.5px solid var(--ink);
+    padding:2px 4px;
+  }
+  #reset{margin-top:14px;font-size:13px;padding:11px;color:var(--crimson)}
+  footer{text-align:center;margin-top:14px;font-size:10.5px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--graphite)}
+
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation:none!important;transition:none!important}
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <section class="piece">
+    <span class="notch t1"></span><span class="notch t2"></span>
+    <span class="notch b1"></span><span class="notch l1"></span><span class="notch r1"></span>
+    <div class="piece-label">Beyin — Parça 01</div>
+
+    <div class="stage">
+      <div id="brainWrap">
+        <svg id="brain" viewBox="0 0 270 230" width="100%" role="img" aria-label="Beyin karakteri">
+          <defs>
+            <clipPath id="brainClip"><path id="clipPath" d=""></path></clipPath>
+          </defs>
+          <g id="shadow" opacity=".14">
+            <ellipse cx="135" cy="205" rx="72" ry="9" fill="#241E1A"></ellipse>
+          </g>
+          <path id="body" d="" stroke="#241E1A" stroke-width="3.2" stroke-linejoin="round"></path>
+          <g id="gyri" clip-path="url(#brainClip)" fill="none" stroke="#241E1A" stroke-width="2.2"
+             stroke-linecap="round" opacity=".55"></g>
+          <g id="spots" clip-path="url(#brainClip)"></g>
+          <g id="face"></g>
+          <g id="drips"></g>
+          <g id="flies"></g>
+        </svg>
+        <div id="healFlash"></div>
+      </div>
+    </div>
+
+    <svg class="grain" width="120" height="16" viewBox="0 0 120 16" aria-hidden="true">
+      <line x1="12" y1="8" x2="108" y2="8" stroke="#6E655B" stroke-width="1.4"></line>
+      <path d="M12 8 L20 3.5 M12 8 L20 12.5" stroke="#6E655B" stroke-width="1.4" fill="none"></path>
+      <path d="M108 8 L100 3.5 M108 8 L100 12.5" stroke="#6E655B" stroke-width="1.4" fill="none"></path>
+    </svg>
+
+    <div class="status">
+      <span class="tag" id="tag">TAZE</span>
+      <span class="hp"><span id="hp">60</span></span>
+    </div>
+    <div class="bar"><i id="bar" style="width:60%"></i></div>
+
+    <div class="fact" id="fact">
+      <div class="big"><span id="factBig">—</span><span class="unit" id="factUnit"></span></div>
+      <p id="factText">…</p>
+    </div>
+
+    <p class="cut-note">Beyin. 1 adet kes.</p>
+  </section>
+
+  <div class="acts">
+    <button id="quit">Vazgeçtim</button>
+    <button id="enter" disabled>Yine de gir <span class="cd" id="cd"></span></button>
+  </div>
+
+  <div class="task" id="task">
+    <h3>Telefon yerine</h3>
+    <p id="taskText"></p>
+  </div>
+
+  <div class="stats">
+    <div><b id="sVisits">0</b><span>Bugün geliş</span></div>
+    <div><b id="sEnters">0</b><span>Giriş</span></div>
+    <div><b id="sQuits">0</b><span>Vazgeçiş</span></div>
+    <div><b id="sTotal">0</b><span>Toplam</span></div>
+  </div>
+
+  <details>
+    <summary>Ayarlar</summary>
+    <div class="row"><label for="age">Yaş</label><input id="age" type="number" inputmode="numeric" min="10" max="79" step="1"></div>
+    <div class="row"><label for="hours">Günlük ortalama ekran saati</label><input id="hours" type="number" inputmode="decimal" min="0.5" max="16" step="0.5"></div>
+    <button id="reset">Her şeyi sıfırla</button>
+  </details>
+
+  <footer>Beyin · v1</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var KEY = "beyin_v1";
+  var SHORTCUT = "shortcuts://run-shortcut?name=InstaGec";
+
+  /* ============================================================
+     AYARLANABİLİR SABİTLER
+     ============================================================ */
+  var START_HEALTH   = 60;
+  var COST_VISIT     = -3;   // sayfa açılışı
+  var COST_ENTER     = -7;   // "Yine de gir"
+  var GAIN_QUIT      = 8;    // "Vazgeçtim"
+  var GAIN_NEW_DAY   = 5;    // yeni gün
+  var REFRESH_MS     = 60000;// bu süre içindeki yenilemeler sayılmaz
+  var LOCK_BASE      = 10;   // sn
+  var LOCK_PER_ENTER = 5;    // sn
+  var LOCK_MAX       = 60;   // sn
+
+  /* ============================================================
+     ACI GERÇEKLER — yeni gerçek eklemek için diziye bir nesne ekle.
+     f(c) alır; c = {age, hours, visits, enters, quits, totalQuits}
+     Döndürür: {big, unit, text}
+     ============================================================ */
+  var GERCEKLER = [
+    function(c){
+      var y = (80 - c.age) * c.hours / 24;
+      return {big: y.toFixed(1), unit:"yıl",
+        text:"80 yaşına kadar bu tempoyla ekrana gidecek net ömür. Uyku değil, ekran."};
+    },
+    function(c){
+      var p = c.hours / 16 * 100;
+      return {big: Math.round(p), unit:"%",
+        text:"Uyanık geçirdiğin günün bu kadarı Reels. Geri kalanı her şey."};
+    },
+    function(c){
+      var h = Math.max(0, (26 - c.age)) * 365 * c.hours;
+      return {big: Math.round(h).toLocaleString("tr-TR"), unit:"saat",
+        text:"26 yaşına kadar bu tempoyla ekranda geçecek toplam saat."};
+    },
+    function(c){
+      var h = Math.max(0, (26 - c.age)) * 365 * c.hours;
+      return {big: (h / 2000).toFixed(1), unit:"yıl mesai",
+        text:"26 yaşına kadarki o saatler, yılda 2000 saatlik tam zamanlı bir işin kaç yılı eder."};
+    },
+    function(c){
+      var y = c.hours * 365 / 2000;
+      return {big: y.toFixed(1), unit:"yıl mesai",
+        text:"Sadece bu yıl. Tam zamanlı çalışan biri bu kadar sürede bir kariyer basamağı çıkıyor."};
+    },
+    function(c){
+      var w = c.hours * 7;
+      return {big: Math.round(w), unit:"saat / hafta",
+        text:"Bir parçayı kalıptan prototipe çıkarmaya yeter. Her hafta. Yeniden."};
+    },
+    function(c){
+      return {big: c.visits, unit:"kez",
+        text:"Bugün bu sayfayı bu kadar kez gördün. Refleks, karar değil."};
+    },
+    function(c){
+      var y = (80 - c.age) * c.hours / 24;
+      return {big: Math.round(y * 12), unit:"ay",
+        text:"Aynı ömür, ay cinsinden. Ay olarak duymak daha yakın geliyor."};
+    },
+    function(c){
+      var h = Math.max(0, (26 - c.age)) * 365 * c.hours;
+      return {big: Math.round(h / 40), unit:"koleksiyon",
+        text:"Bir kapsül koleksiyonu 40 saat sürüyor diyelim. 26 yaşına kadarki ekran saatin bu kadar koleksiyon eder."};
+    },
+    function(c){
+      return {big: Math.round(c.hours * 60), unit:"dakika",
+        text:"Bugünün bütçesi. Creative director olan kimse bunu bir başkasının kurgusunu izleyerek harcamadı."};
+    },
+    function(c){
+      var y = Math.max(0, 26 - c.age);
+      return {big: y, unit:"yıl kaldı",
+        text:"Finansal bağımsızlık ve kendi markan için verdiğin süre. Gün sayısı: " +
+             Math.round(y * 365).toLocaleString("tr-TR") + "."};
+    },
+    function(c){
+      return {big: c.totalQuits, unit:"vazgeçiş",
+        text:"Şimdiye kadar geri döndüğün an sayısı. Kanıt burada duruyor."};
+    }
+  ];
+
+  /* ============================================================
+     KÜÇÜK GÖREVLER
+     ============================================================ */
+  var GOREVLER = [
+    "Bir eskiz çiz. Kötü olsun, olsun.",
+    "20 squat. Şimdi.",
+    "Telefonu başka bir odaya bırak.",
+    "Bir bardak su iç.",
+    "Pencereyi aç, 10 kez derin nefes.",
+    "Bir dikiş payı ölç, bir parça kes.",
+    "Aklındaki fikri tek cümleyle yaz.",
+    "Odandaki bir yüzeyi topla.",
+    "2 dakika gözlerini kapat, hiçbir şey yapma.",
+    "Bir referans görselini kaydet, neden sevdiğini yaz.",
+    "Ayakta esne, omuzlarını aç.",
+    "Birine bir cümlelik mesaj at — gerçek biri."
+  ];
+
+  /* ============================================================
+     DURUM
+     ============================================================ */
+  function today(){
+    var d = new Date();
+    return d.getFullYear() + "-" + (d.getMonth()+1) + "-" + d.getDate();
+  }
+  function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+
+  var defaults = {
+    health: START_HEALTH,
+    lastTs: 0,
+    day: "",
+    visits: 0, enters: 0, quits: 0,
+    totalQuits: 0, totalEnters: 0,
+    age: 24, hours: 8,
+    bag: []
+  };
+
+  var S;
+  function load(){
+    var raw = null;
+    try { raw = localStorage.getItem(KEY); } catch(e){}
+    S = Object.assign({}, defaults);
+    if (raw){
+      try {
+        var p = JSON.parse(raw);
+        for (var k in defaults) if (p[k] !== undefined && p[k] !== null) S[k] = p[k];
+      } catch(e){}
+    }
+    S.health = clamp(Number(S.health) || 0, 0, 100);
+    S.age    = clamp(Number(S.age)   || defaults.age, 10, 79);
+    S.hours  = clamp(Number(S.hours) || defaults.hours, 0.5, 16);
+    if (!Array.isArray(S.bag)) S.bag = [];
+  }
+  function save(){
+    try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e){}
+  }
+
+  /* ============================================================
+     ZİYARET MANTIĞI
+     ============================================================ */
+  function registerVisit(){
+    var now = Date.now();
+    var d = today();
+
+    if (S.day !== d){
+      if (S.day !== "") S.health = clamp(S.health + GAIN_NEW_DAY, 0, 100);
+      S.day = d; S.visits = 0; S.enters = 0; S.quits = 0;
+    }
+    if (now - (S.lastTs || 0) > REFRESH_MS){
+      S.visits += 1;
+      S.health = clamp(S.health + COST_VISIT, 0, 100);
+      S.lastTs = now;
+    }
+    save();
+  }
+
+  /* ============================================================
+     BEYİN ÇİZİMİ
+     ============================================================ */
+  var el = function(id){ return document.getElementById(id); };
+  var SVGNS = "http://www.w3.org/2000/svg";
+
+  var BODY_PATH =
+    "M135 26 C 168 12, 214 22, 226 52 C 250 60, 254 96, 236 112 " +
+    "C 248 132, 236 164, 210 172 C 202 194, 168 202, 148 190 " +
+    "C 140 196, 130 196, 122 190 C 102 202, 68 194, 60 172 " +
+    "C 34 164, 22 132, 34 112 C 16 96, 20 60, 44 52 C 56 22, 102 12, 135 26 Z";
+
+  var GYRI = [
+    "M135 30 C 132 62, 136 96, 133 130 C 131 156, 136 176, 135 190",
+    "M72 54 C 92 66, 96 92, 82 106 C 68 120, 76 142, 96 150",
+    "M198 54 C 178 66, 174 92, 188 106 C 202 120, 194 142, 174 150",
+    "M50 92 C 70 96, 84 84, 96 70",
+    "M220 92 C 200 96, 186 84, 174 70",
+    "M64 140 C 84 148, 102 142, 112 168",
+    "M206 140 C 186 148, 168 142, 158 168",
+    "M104 40 C 110 56, 104 74, 92 82",
+    "M166 40 C 160 56, 166 74, 178 82"
+  ];
+
+  // deterministik "rastgele"
+  function rnd(seed){
+    var x = Math.sin(seed * 127.1) * 43758.5453;
+    return x - Math.floor(x);
+  }
+
+  var SPOTS = [];
+  for (var i = 0; i < 22; i++){
+    SPOTS.push({
+      x: 46 + rnd(i + 1) * 178,
+      y: 34 + rnd(i + 7.3) * 150,
+      r: 4 + rnd(i + 13.7) * 11
+    });
+  }
+
+  function mix(a, b, t){
+    return [
+      Math.round(a[0] + (b[0]-a[0])*t),
+      Math.round(a[1] + (b[1]-a[1])*t),
+      Math.round(a[2] + (b[2]-a[2])*t)
+    ];
+  }
+  function rgb(c){ return "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")"; }
+
+  var C_FRESH = [232,150,160];  // pembe
+  var C_MID   = [138,146,124];  // gri-yeşil
+  var C_DEAD  = [ 74, 52, 40];  // koyu kahve
+
+  function bodyColor(h){
+    if (h >= 50) return rgb(mix(C_MID, C_FRESH, (h - 50) / 50));
+    return rgb(mix(C_DEAD, C_MID, h / 50));
+  }
+
+  function tagFor(h){
+    if (h >= 78) return "TAZE";
+    if (h >= 55) return "YORGUN";
+    if (h >= 35) return "BULANIK";
+    if (h >= 15) return "ÇÜRÜYOR";
+    return "ZOMBİ";
+  }
+
+  function mk(name, attrs){
+    var n = document.createElementNS(SVGNS, name);
+    for (var k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  }
+  function clear(node){ while (node.firstChild) node.removeChild(node.firstChild); }
+
+  var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function drawBrain(h){
+    el("body").setAttribute("d", BODY_PATH);
+    el("clipPath").setAttribute("d", BODY_PATH);
+    el("body").setAttribute("fill", bodyColor(h));
+
+    // kıvrımlar
+    var g = el("gyri");
+    if (!g.childNodes.length){
+      GYRI.forEach(function(d){ g.appendChild(mk("path", {d: d})); });
+    }
+    g.setAttribute("opacity", (0.28 + (h/100) * 0.34).toFixed(2));
+
+    // çürük lekeler
+    var sp = el("spots"); clear(sp);
+    var count = Math.round((100 - h) / 100 * SPOTS.length);
+    for (var i = 0; i < count; i++){
+      var s = SPOTS[i];
+      sp.appendChild(mk("ellipse", {
+        cx: s.x.toFixed(1), cy: s.y.toFixed(1),
+        rx: s.r.toFixed(1), ry: (s.r * 0.78).toFixed(1),
+        fill: "#3A2A20", opacity: (0.16 + (1 - h/100) * 0.4).toFixed(2)
+      }));
+      if (i % 3 === 0){
+        sp.appendChild(mk("ellipse", {
+          cx: (s.x + 4).toFixed(1), cy: (s.y + 3).toFixed(1),
+          rx: (s.r*0.45).toFixed(1), ry: (s.r*0.35).toFixed(1),
+          fill: "#1B120C", opacity: "0.35"
+        }));
+      }
+    }
+
+    // yüz
+    var f = el("face"); clear(f);
+    var ex1 = 106, ex2 = 164, ey = 116;
+    if (h < 30){
+      [ex1, ex2].forEach(function(x){
+        f.appendChild(mk("path", {
+          d: "M" + (x-9) + " " + (ey-9) + " L" + (x+9) + " " + (ey+9) +
+             " M" + (x+9) + " " + (ey-9) + " L" + (x-9) + " " + (ey+9),
+          stroke: "#241E1A", "stroke-width": "4", "stroke-linecap": "round"
+        }));
+      });
+      f.appendChild(mk("path", {
+        d: "M108 152 Q135 138 162 152", fill:"none",
+        stroke:"#241E1A", "stroke-width":"3.4", "stroke-linecap":"round"
+      }));
+    } else {
+      [ex1, ex2].forEach(function(x){
+        f.appendChild(mk("ellipse", {cx:x, cy:ey, rx:"9.5", ry:"10.5", fill:"#F5EFE3", stroke:"#241E1A","stroke-width":"2.6"}));
+        f.appendChild(mk("circle", {cx:x, cy: h < 50 ? ey+3 : ey, r:"4.4", fill:"#241E1A"}));
+        if (h < 50){ // yorgun göz kapakları
+          f.appendChild(mk("path", {
+            d:"M" + (x-10.5) + " " + (ey-2) + " Q" + x + " " + (ey+5) + " " + (x+10.5) + " " + (ey-2),
+            fill:"#241E1A", opacity:".9"
+          }));
+        }
+      });
+      var mouth = h >= 75 ? "M108 148 Q135 168 162 148"
+                : h >= 50 ? "M110 154 L160 154"
+                          : "M110 158 Q135 146 160 158";
+      f.appendChild(mk("path", {d: mouth, fill:"none", stroke:"#241E1A","stroke-width":"3.4","stroke-linecap":"round"}));
+    }
+
+    // damlalar
+    var dr = el("drips"); clear(dr);
+    if (h < 50){
+      var n = h < 25 ? 4 : h < 38 ? 3 : 2;
+      for (var j = 0; j < n; j++){
+        var dx = 62 + rnd(j + 31) * 146;
+        var dy = 150 + rnd(j + 41) * 22;
+        var drop = mk("path", {
+          d: "M" + dx + " " + dy + " c -5 8, -5 14, 0 14 c 5 0, 5 -6, 0 -14 z",
+          fill: "#4A3428", opacity: ".85"
+        });
+        if (!reduced){
+          drop.setAttribute("class", "drip");
+          drop.style.animationDelay = (j * 0.55) + "s";
+        }
+        dr.appendChild(drop);
+      }
+    }
+
+    // sinekler
+    var fl = el("flies"); clear(fl);
+    if (h < 30 && !reduced){
+      for (var k = 0; k < 3; k++){
+        var gg = mk("g", {class:"fly"});
+        gg.style.animationDelay = (k * 1.1) + "s";
+        gg.style.animationDuration = (3 + k * 0.6) + "s";
+        var r = 92 + k * 13;
+        gg.appendChild(mk("circle", {cx: 135 + r, cy: 118 - k * 16, r: "3.2", fill: "#241E1A"}));
+        fl.appendChild(gg);
+      }
+    }
+
+    // sallanma
+    el("brainWrap").className = (h < 40 && !reduced) ? "sway" : "";
+  }
+
+  /* ============================================================
+     GERÇEK SEÇİMİ (torba usulü rotasyon)
+     ============================================================ */
+  function ctx(){
+    return {age:S.age, hours:S.hours, visits:S.visits,
+            enters:S.enters, quits:S.quits, totalQuits:S.totalQuits};
+  }
+  function nextFact(){
+    if (!S.bag.length){
+      var idx = GERCEKLER.map(function(_, i){ return i; });
+      for (var i = idx.length - 1; i > 0; i--){
+        var j = Math.floor(Math.random() * (i + 1));
+        var t = idx[i]; idx[i] = idx[j]; idx[j] = t;
+      }
+      S.bag = idx;
+    }
+    S.bag = S.bag.filter(function(i){ return i < GERCEKLER.length; });
+    var pick = S.bag.shift();
+    if (pick === undefined) pick = 0;
+    save();
+    return GERCEKLER[pick](ctx());
+  }
+  function showFact(){
+    var f = nextFact();
+    el("factBig").textContent = f.big;
+    el("factUnit").textContent = f.unit || "";
+    el("factText").textContent = f.text;
+    var box = el("fact");
+    box.classList.remove("swap"); void box.offsetWidth; box.classList.add("swap");
+  }
+
+  /* ============================================================
+     ARAYÜZ
+     ============================================================ */
+  function render(){
+    var h = Math.round(S.health);
+    el("hp").textContent = h;
+    el("tag").textContent = tagFor(h);
+    el("bar").style.width = h + "%";
+    el("sVisits").textContent = S.visits;
+    el("sEnters").textContent = S.enters;
+    el("sQuits").textContent = S.quits;
+    el("sTotal").textContent = S.totalQuits;
+    el("age").value = S.age;
+    el("hours").value = S.hours;
+    drawBrain(h);
+  }
+
+  var lockTimer = null;
+  function startLock(){
+    var secs = Math.min(LOCK_BASE + LOCK_PER_ENTER * S.enters, LOCK_MAX);
+    var btn = el("enter"), cd = el("cd");
+    btn.disabled = true;
+    clearInterval(lockTimer);
+    cd.textContent = "· " + secs;
+    lockTimer = setInterval(function(){
+      secs -= 1;
+      if (secs <= 0){
+        clearInterval(lockTimer);
+        cd.textContent = "";
+        btn.disabled = false;
+      } else {
+        cd.textContent = "· " + secs;
+      }
+    }, 1000);
+  }
+
+  el("enter").addEventListener("click", function(){
+    if (el("enter").disabled) return;
+    S.enters += 1;
+    S.totalEnters += 1;
+    S.health = clamp(S.health + COST_ENTER, 0, 100);
+    save(); render();
+    window.location.href = SHORTCUT;
+  });
+
+  el("quit").addEventListener("click", function(){
+    S.quits += 1;
+    S.totalQuits += 1;
+    S.health = clamp(S.health + GAIN_QUIT, 0, 100);
+    save(); render();
+
+    var flash = el("healFlash");
+    flash.classList.remove("on"); void flash.offsetWidth; flash.classList.add("on");
+
+    var t = el("task");
+    el("taskText").textContent = GOREVLER[Math.floor(Math.random() * GOREVLER.length)];
+    t.classList.add("on");
+    t.scrollIntoView({behavior: reduced ? "auto" : "smooth", block:"nearest"});
+  });
+
+  el("age").addEventListener("change", function(){
+    S.age = clamp(parseFloat(this.value) || defaults.age, 10, 79);
+    this.value = S.age; save(); showFact();
+  });
+  el("hours").addEventListener("change", function(){
+    S.hours = clamp(parseFloat(this.value) || defaults.hours, 0.5, 16);
+    this.value = S.hours; save(); showFact();
+  });
+  el("reset").addEventListener("click", function(){
+    if (!confirm("Beyin sağlığı ve tüm istatistikler sıfırlanacak. Emin misin?")) return;
+    try { localStorage.removeItem(KEY); } catch(e){}
+    load(); S.day = today(); save(); render(); showFact();
+  });
+
+  /* ---- başlat ---- */
+  load();
+  registerVisit();
+  render();
+  showFact();
+  startLock();
+})();
+</script>
+</body>
+</html>
