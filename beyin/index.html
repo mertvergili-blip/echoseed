@@ -22,7 +22,7 @@
     --crimson:#DC3B2F; --flame:#FF7A1A;
     --ui:"Poppins",-apple-system,"SF Pro Text","Helvetica Neue",sans-serif;
     --num:"Baloo 2","Poppins",-apple-system,sans-serif;
-    --hillTop:236px;
+    --hillTop:222px;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;padding:0}
@@ -57,7 +57,7 @@
   .streak em{font-style:normal;font-family:var(--num);font-weight:800;font-size:15px;display:block;margin-top:-1px}
 
   /* ---------- sahne ---------- */
-  .stage{display:flex;justify-content:center;margin-top:30px}
+  .stage{display:flex;justify-content:center;margin-top:18px}
   #brainWrap{width:min(53vw,198px);transform-origin:50% 92%;position:relative}
   #brainWrap.sway{animation:sway 2.4s ease-in-out infinite}
   #brainWrap.breathe{animation:bob 3.2s ease-in-out infinite}
@@ -65,7 +65,7 @@
   @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
   .drip{animation:drip 2.2s linear infinite}
   @keyframes drip{0%{opacity:0;transform:translateY(0)}14%{opacity:1}100%{opacity:0;transform:translateY(44px)}}
-  .fly{animation:orbit 3.4s linear infinite;transform-origin:150px 125px}
+  .fly{animation:orbit 3.4s linear infinite;transform-origin:150px 128px}
   @keyframes orbit{from{transform:rotate(0)}to{transform:rotate(360deg)}}
   #healFlash{
     position:absolute;inset:-8%;border-radius:50%;
@@ -75,7 +75,7 @@
   #healFlash.on{animation:heal 1100ms ease-out}
   @keyframes heal{0%{opacity:0;transform:scale(.55)}25%{opacity:1}100%{opacity:0;transform:scale(1.5)}}
 
-  #hpsvg{display:block;width:100%;max-width:230px;margin:-8px auto 0}
+  #hpsvg{display:block;width:100%;max-width:200px;margin:-6px auto 0}
   #hpsvg text{font-family:var(--num);font-weight:800}
   .tagline{text-align:center;margin-top:-2px}
   #tag{
@@ -84,39 +84,39 @@
   }
   .bar{
     height:14px;border-radius:999px;background:rgba(255,255,255,.6);
-    margin:12px 4px 0;overflow:hidden;
+    margin:9px 4px 0;overflow:hidden;
   }
   .bar i{display:block;height:100%;border-radius:999px;background:var(--green);
     transition:width .7s cubic-bezier(.2,.8,.2,1),background .5s}
 
   /* ---------- karolar ---------- */
-  .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-top:18px}
-  .tiles div{background:var(--tile);border-radius:20px;padding:13px 5px 12px;text-align:center}
+  .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+  .tiles div{background:var(--tile);border-radius:20px;padding:11px 5px 10px;text-align:center}
   .tiles i{display:block;font-style:normal;font-size:20px;line-height:1;margin-bottom:6px}
   .tiles b{display:block;font-family:var(--num);font-weight:800;font-size:22px;line-height:1}
   .tiles span{display:block;margin-top:3px;font-size:10.5px;font-weight:500;color:var(--muted-hill)}
 
   /* ---------- bölüm başlığı ---------- */
-  h2{margin:22px 2px 10px;font-size:16px;font-weight:700;letter-spacing:-.01em}
+  h2{margin:16px 2px 8px;font-size:16px;font-weight:700;letter-spacing:-.01em}
 
   /* ---------- acı gerçek ---------- */
-  .fact{background:var(--tile-2);border-radius:24px;padding:20px 18px 22px;text-align:center}
+  .fact{background:var(--tile-2);border-radius:24px;padding:16px 16px 18px;text-align:center}
   .fact .big{
     font-family:var(--num);font-weight:800;color:var(--crimson);
-    font-size:clamp(50px,15vw,70px);line-height:1;letter-spacing:-.02em;
+    font-size:clamp(42px,13vw,58px);line-height:1;letter-spacing:-.02em;
     display:flex;align-items:baseline;justify-content:center;gap:8px;flex-wrap:wrap;
   }
   .fact .unit{font-family:var(--ui);font-size:13.5px;font-weight:700;letter-spacing:.06em;
     text-transform:uppercase;color:var(--ink)}
-  .fact p{margin:10px 2px 0;font-size:14.5px;font-weight:500;color:#4C4356;line-height:1.45}
+  .fact p{margin:8px 2px 0;font-size:14px;font-weight:500;color:#4C4356;line-height:1.45}
   .fact.swap{animation:swap 460ms cubic-bezier(.2,.8,.2,1)}
   @keyframes swap{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 
   /* ---------- düğmeler ---------- */
-  .acts{display:grid;gap:10px;margin-top:16px}
+  .acts{display:grid;gap:9px;margin-top:12px}
   button{
     font-family:var(--ui);font-weight:700;font-size:17px;border:0;
-    border-radius:22px;padding:17px 18px;width:100%;cursor:pointer;
+    border-radius:22px;padding:15px 18px;width:100%;cursor:pointer;
     transition:transform .1s ease,box-shadow .1s ease,opacity .2s ease;
   }
   #quit{background:var(--green);color:#0E2E1B;box-shadow:0 5px 0 rgba(25,19,32,.28)}
@@ -186,6 +186,29 @@
   nav button.on i{filter:none;opacity:1}
   nav button:active{transform:none}
 
+  /* kısa ekranlar (iPhone SE vb.): sahne küçülsün, ana düğme katlamanın üstünde kalsın */
+  @media (max-height:730px){
+    .app{--hillTop:170px}
+    .stage{margin-top:6px}
+    #brainWrap{width:min(40vw,142px)}
+    #hpsvg{max-width:150px;margin:-4px auto 0}
+    .bar{height:12px;margin-top:7px}
+    .tiles{gap:8px;margin-top:10px}
+    .tiles div{padding:8px 4px 7px;border-radius:16px}
+    .tiles i{font-size:16px;margin-bottom:3px}
+    .tiles b{font-size:18px}
+    .tiles span{font-size:9.5px}
+    h2{margin:12px 2px 6px;font-size:14.5px}
+    .fact{padding:12px 14px 14px;border-radius:20px}
+    .fact .big{font-size:clamp(34px,11vw,44px)}
+    .fact .unit{font-size:12px}
+    .fact p{margin:6px 2px 0;font-size:12.5px}
+    .acts{gap:7px;margin-top:10px}
+    button{padding:12px 16px;font-size:15.5px;border-radius:18px}
+    #enter{font-size:13.5px}
+    #tag{font-size:10.5px}
+  }
+
   [hidden]{display:none!important}
   @media (prefers-reduced-motion:reduce){
     *,*::before,*::after{animation:none!important;transition:none!important}
@@ -208,7 +231,7 @@
       <div id="brainWrap">
         <svg id="brain" viewBox="0 0 300 300" width="100%" role="img" aria-label="Beyin karakteri">
           <defs><clipPath id="brainClip"></clipPath></defs>
-          <ellipse id="shadow" cx="150" cy="272" rx="60" ry="9" fill="#191320" opacity=".16"></ellipse>
+          <ellipse id="shadow" cx="150" cy="252" rx="58" ry="8.5" fill="#191320" opacity=".16"></ellipse>
           <g id="legs"></g>
           <g id="lobeOutline"></g>
           <g id="lobeFill"></g>
@@ -461,26 +484,31 @@
     return x - Math.floor(x);
   }
 
-  /* lob daireleri — birleşimleri silüeti verir */
+  /* lob daireleri — çok sayıda küçük kabarcık: geniş, tırtıklı beyin silüeti */
   var LOBES = (function(){
-    var L = [{cx:CX, cy:CY, rx:92, ry:70}];
-    [{a:-76,r:33},{a:-44,r:33},{a:-12,r:32},{a:20,r:30},{a:52,r:27},{a:82,r:23}].forEach(function(o){
+    var L = [{cx:CX, cy:CY, rx:96, ry:62}];            // geniş çekirdek
+    var ring = [
+      {a:-71, r:28}, {a:-50, r:29}, {a:-30, r:29},
+      {a:-13, r:28}, {a: 10, r:27}, {a: 33, r:26},
+      {a: 57, r:24}, {a: 80, r:22}
+    ];
+    ring.forEach(function(o){
       var t = o.a * Math.PI / 180;
-      var x = CX + 78 * Math.cos(t), y = CY + 56 * Math.sin(t);
-      L.push({cx:x, cy:y, rx:o.r, ry:o.r * 0.9});
-      L.push({cx:CX - (x - CX), cy:y, rx:o.r, ry:o.r * 0.9});
+      var x = CX + 82 * Math.cos(t), y = CY + 50 * Math.sin(t);
+      L.push({cx:x, cy:y, rx:o.r, ry:o.r * 0.94});
+      L.push({cx:CX - (x - CX), cy:y, rx:o.r, ry:o.r * 0.94});   // ayna
     });
-    L.push({cx:CX, cy:CY - 62, rx:28, ry:24});
     return L;
   })();
 
-  /* kıvrımlar — sade, simetrik; yüz bölgesine girmez */
-  var FISSURE = "M150 46 C 146 66, 153 84, 150 104";
+  /* kıvrımlar — sol taraf yazılır, sağ ayna alınır */
+  var FISSURE = "M150 62 C 145 86, 154 104, 150 126";
   var GYRI_L = [
-    "M136 52 C 112 56, 100 70, 106 92",
-    "M108 36 C 98 52, 80 56, 68 72",
-    "M60 96 C 82 98, 94 108, 92 126",
-    "M56 142 C 76 144, 88 154, 90 170"
+    "M140 74 C 119 78, 108 90, 114 106",
+    "M116 62 C 104 74, 88 78, 78 90",
+    "M70 106 C 90 108, 101 116, 99 131",
+    "M132 94 C 119 98, 112 107, 116 118",
+    "M74 134 C 86 136, 93 141, 95 149"
   ];
 
   /* lekeler yüz bölgesine düşmesin */
@@ -488,11 +516,11 @@
   for (var i = 0, seed = 0; SPOTS.length < 16 && seed < 400; seed++){
     var ang = rnd(seed + 2.7) * Math.PI * 2;
     var rad = 0.30 + rnd(seed + 5.9) * 0.62;
-    var sx = CX + Math.cos(ang) * 100 * rad;
-    var sy = CY + Math.sin(ang) * 80 * rad;
-    var ddx = (sx - CX) / 66, ddy = (sy - 150) / 46;
+    var sx = CX + Math.cos(ang) * 104 * rad;
+    var sy = CY + Math.sin(ang) * 66 * rad;
+    var ddx = (sx - CX) / 58, ddy = (sy - 148) / 40;
     if (ddx*ddx + ddy*ddy < 1) continue;
-    SPOTS.push({x:sx, y:sy, r: 8 + rnd(seed + 11.3) * 11, s: rnd(seed + 17.1)});
+    SPOTS.push({x:sx, y:sy, r: 7 + rnd(seed + 11.3) * 9, s: rnd(seed + 17.1)});
     i++;
   }
 
@@ -502,7 +530,7 @@
   function rgb(c){ return "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")"; }
   function shade(c,t){ return t < 0 ? rgb(mix(c,[25,19,32],-t)) : rgb(mix(c,[255,250,246],t)); }
 
-  var C_FRESH = [242,183,156];
+  var C_FRESH = [240,176,150];
   var C_MID   = [150,152,126];
   var C_DEAD  = [ 86, 60, 44];
 
@@ -532,18 +560,18 @@
 
   function drawBrain(h){
     var base = bodyRGB(h);
-    var fold = shade(base, -0.3);
+    var fold = rgb(mix(base, [148, 78, 54], 0.45));   // sıcak kahve-şeftali oyuk rengi
 
     /* bacaklar (gövdenin arkasında) */
     var lg = el("legs"); clear(lg);
     var legDrop = h < 35 ? 4 : 0;
-    [[131, -1], [169, 1]].forEach(function(p){
+    [[137, -1], [163, 1]].forEach(function(p){
       var x = p[0], dir = p[1];
       lg.appendChild(mk("path", {
-        d:"M" + x + " 184 C " + x + " 212, " + (x + dir*3) + " 224, " + (x + dir*5) + " " + (236 + legDrop),
-        fill:"none", stroke:OUT, "stroke-width":"8.5", "stroke-linecap":"round"
+        d:"M" + x + " 176 C " + (x + dir*1) + " 200, " + (x + dir*2) + " 214, " + (x + dir*4) + " " + (228 + legDrop),
+        fill:"none", stroke:OUT, "stroke-width":"7.5", "stroke-linecap":"round"
       }));
-      lg.appendChild(mk("ellipse", {cx:(x + dir*12), cy:(240 + legDrop), rx:"13", ry:"7.5", fill:OUT}));
+      lg.appendChild(mk("ellipse", {cx:(x + dir*12), cy:(232 + legDrop), rx:"12", ry:"6.5", fill:OUT}));
     });
 
     /* silüet */
@@ -595,47 +623,47 @@
     var f = el("face"); clear(f);
     var lum = 0.299*base[0] + 0.587*base[1] + 0.114*base[2];
     var INK = lum < 105 ? "#F6EFE6" : OUT;
-    var EX = 34, EY = 132;
+    var EX = 29, EY = 134;
     var eyes = [CX - EX, CX + EX];
 
     if (h >= 55){
-      [CX - 58, CX + 58].forEach(function(x){
-        f.appendChild(mk("ellipse", {cx:x, cy:EY + 16, rx:"12", ry:"7",
-          fill:"#E0705C", opacity:((h - 55) / 45 * 0.35 + 0.2).toFixed(2)}));
+      [CX - 62, CX + 62].forEach(function(x){
+        f.appendChild(mk("ellipse", {cx:x, cy:EY + 18, rx:"13", ry:"7.5",
+          fill:"#EC8A78", opacity:((h - 55) / 45 * 0.35 + 0.2).toFixed(2)}));
       });
     }
 
     if (h < 15){                                   // ZOMBİ
       eyes.forEach(function(x){
         f.appendChild(mk("path", {
-          d:"M"+(x-10)+" "+(EY-10)+" L"+(x+10)+" "+(EY+10)+" M"+(x+10)+" "+(EY-10)+" L"+(x-10)+" "+(EY+10),
+          d:"M"+(x-9)+" "+(EY-9)+" L"+(x+9)+" "+(EY+9)+" M"+(x+9)+" "+(EY-9)+" L"+(x-9)+" "+(EY+9),
           stroke:INK, "stroke-width":"7", "stroke-linecap":"round"
         }));
       });
-      f.appendChild(mk("path", {d:"M120 176 q10 -10 20 0 q10 10 20 0 q10 -10 20 0",
+      f.appendChild(mk("path", {d:"M122 166 q9 -9 18 0 q9 9 18 0 q9 -9 18 0",
         fill:"none", stroke:INK, "stroke-width":"5.5", "stroke-linecap":"round"}));
     } else if (h < 35){                            // ÇÜRÜYOR
       eyes.forEach(function(x){
-        f.appendChild(mk("path", {d:"M"+(x-9)+" "+EY+" a9 10 0 0 0 18 0 z", fill:INK}));
-        f.appendChild(mk("path", {d:"M"+(x-11)+" "+(EY-1)+" L"+(x+11)+" "+(EY-1),
+        f.appendChild(mk("path", {d:"M"+(x-8)+" "+EY+" a8 9 0 0 0 16 0 z", fill:INK}));
+        f.appendChild(mk("path", {d:"M"+(x-10)+" "+(EY-1)+" L"+(x+10)+" "+(EY-1),
           fill:"none", stroke:INK, "stroke-width":"5.5", "stroke-linecap":"round"}));
       });
-      f.appendChild(mk("path", {d:"M130 180 q20 -13 40 0",
+      f.appendChild(mk("path", {d:"M132 170 q18 -12 36 0",
         fill:"none", stroke:INK, "stroke-width":"5.5", "stroke-linecap":"round"}));
     } else if (h < 55){                            // BULANIK
       eyes.forEach(function(x){
-        f.appendChild(mk("path", {d:"M"+(x-11)+" "+EY+" q11 10 22 0",
+        f.appendChild(mk("path", {d:"M"+(x-10)+" "+EY+" q10 9 20 0",
           fill:"none", stroke:INK, "stroke-width":"6", "stroke-linecap":"round"}));
       });
-      f.appendChild(mk("path", {d:"M132 174 L168 174",
+      f.appendChild(mk("path", {d:"M134 164 L166 164",
         fill:"none", stroke:INK, "stroke-width":"5.5", "stroke-linecap":"round"}));
     } else {                                       // YORGUN / TAZE
       eyes.forEach(function(x){
-        f.appendChild(mk("ellipse", {cx:x, cy:EY, rx:"8.5", ry:"10.5", fill:INK}));
+        f.appendChild(mk("ellipse", {cx:x, cy:EY, rx:"7", ry:"8.8", fill:INK}));
       });
       f.appendChild(mk("path", {
-        d: h >= 78 ? "M131 168 q19 18 38 0" : "M134 170 q16 11 32 0",
-        fill:"none", stroke:INK, "stroke-width":"5.5", "stroke-linecap":"round"
+        d: h >= 78 ? "M132 158 q18 17 36 0" : "M135 160 q15 11 30 0",
+        fill:"none", stroke:INK, "stroke-width":"5", "stroke-linecap":"round"
       }));
     }
 
@@ -645,8 +673,8 @@
       var n = h < 25 ? 4 : h < 38 ? 3 : 2;
       for (var j = 0; j < n; j++){
         var side = (j % 2 === 0) ? -1 : 1;
-        var dx2 = CX + side * (34 + rnd(j + 31) * 30);
-        var dy2 = 182 + rnd(j + 41) * 10;
+        var dx2 = CX + side * (38 + rnd(j + 31) * 34);
+        var dy2 = 172 + rnd(j + 41) * 10;
         var drop = mk("path", {
           d:"M" + dx2 + " " + dy2 + " c -7 11, -7 19, 0 19 c 7 0, 7 -8, 0 -19 z",
           fill: shade(base, -0.45), stroke:OUT, "stroke-width":"3.5", "stroke-linejoin":"round"
