@@ -68,7 +68,7 @@
   /* ── üst çubuk ── */
   .top{display:flex;align-items:center;justify-content:space-between;gap:var(--s1)}
   .chip{
-    display:flex;align-items:center;gap:6px;height:44px;padding:0 14px;
+    display:flex;align-items:center;gap:6px;height:41px;padding:0 13px;
     background:var(--cream);border:3px solid var(--ink);border-radius:999px;
     box-shadow:0 3px 0 rgba(23,21,27,.9);
     font-family:var(--display);font-weight:800;font-size:17px;line-height:1;
@@ -76,7 +76,7 @@
   }
   .hpMini{display:none;padding-left:9px;margin-left:3px;border-left:3px solid rgba(23,21,27,.2)}
   .iconbtn{
-    width:44px;height:44px;flex:none;display:grid;place-items:center;
+    width:41px;height:41px;flex:none;display:grid;place-items:center;
     background:var(--cream);border:3px solid var(--ink);border-radius:999px;
     box-shadow:0 3px 0 rgba(23,21,27,.9);cursor:pointer;color:var(--ink);
     transition:transform .12s var(--ease),box-shadow .12s var(--ease);
@@ -84,15 +84,15 @@
   .iconbtn:active{transform:translateY(3px);box-shadow:0 0 0 rgba(23,21,27,.9)}
 
   /* çıkartma kelime işareti */
-  .mark{position:relative;font-family:var(--display);font-weight:800;font-size:34px;
+  .mark{position:relative;font-family:var(--display);font-weight:800;font-size:30px;
     line-height:1;letter-spacing:.02em;color:var(--ink);
-    padding:4px 16px 6px;background:#fff;border:4px solid var(--ink);border-radius:999px;
+    padding:3px 15px 5px;background:#fff;border:4px solid var(--ink);border-radius:999px;
     box-shadow:0 4px 0 rgba(23,21,27,.9);transform:rotate(-1.5deg)}
   .mark .spark{position:absolute;top:-14px;right:-6px;display:block}
 
   /* ── sahne / maskot ── */
   .stage{position:relative;display:grid;place-items:center;margin-top:var(--s1)}
-  #mascotWrap{width:min(44vw,172px);transform-origin:50% 90%}
+  #mascotWrap{width:min(40vw,158px);transform-origin:50% 90%}
   #mascot{display:block;width:100%;height:auto}
   #mascot.cheer{animation:cheerpop 620ms var(--ease)}
   @keyframes cheerpop{0%{transform:scale(.86) rotate(-6deg)}60%{transform:scale(1.08) rotate(3deg)}100%{transform:none}}
@@ -114,8 +114,9 @@
   }
 
   /* ölçüm kartı: halka + yüzde */
-  .metric{display:flex;align-items:center;gap:12px;margin-top:12px;padding:12px 14px}
-  .ring{width:58px;height:58px;flex:none;position:relative}
+  .metric{margin-top:10px;padding:9px 13px 10px}
+  .mrow{display:flex;align-items:center;gap:12px}
+  .ring{width:54px;height:54px;flex:none;position:relative}
   .ring svg{transform:rotate(-90deg)}
   .ring .mini{position:absolute;inset:0;display:grid;place-items:center}
   .pct{display:flex;align-items:baseline;gap:2px;font-family:var(--display);font-weight:800;
@@ -125,8 +126,18 @@
   .metric .state{margin-left:auto;font-weight:800;font-size:13px;
     padding:5px 11px;border-radius:999px;border:3px solid var(--ink);white-space:nowrap}
 
+  /* günlük bütçe şeridi (ölçüm kartının alt satırı) */
+  .bl{margin:7px 0 5px;display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+    padding-top:7px;border-top:2px solid rgba(23,21,27,.12)}
+  .bl span{font-family:var(--display);font-weight:800;font-size:19px;line-height:1;
+    font-variant-numeric:tabular-nums}
+  .bl em{font-style:normal;font-size:12.5px;font-weight:700;opacity:.62}
+  .bmeter{height:8px;border-radius:99px;background:rgba(23,21,27,.14);overflow:hidden}
+  .bmeter i{display:block;height:100%;border-radius:99px;transform-origin:left;
+    transform:scaleX(var(--p,0));transition:transform .8s var(--ease),background .4s linear}
+
   /* konuşma balonu */
-  .bubble{display:flex;align-items:flex-end;gap:8px;margin-top:12px}
+  .bubble{display:flex;align-items:flex-end;gap:8px;margin-top:10px}
   .bubble .mini{width:46px;flex:none;line-height:0}
   .bubble .say{
     position:relative;flex:1;background:var(--cream);border:4px solid var(--ink);
@@ -141,22 +152,22 @@
   .bubble small{display:block;margin-top:2px;font-weight:600;font-size:12.5px;opacity:.68}
 
   /* gelecek maliyeti kartı */
-  .cost{margin-top:12px;text-align:center;position:relative;padding:12px 14px 14px}
-  .cost .lead{font-weight:700;font-size:13px;opacity:.75}
+  .cost{margin-top:10px;text-align:center;position:relative;padding:10px 12px 11px}
+  .cost .lead{font-weight:700;font-size:12px;opacity:.7}
   .cost .big{
     display:flex;align-items:baseline;justify-content:center;gap:10px;flex-wrap:wrap;
     margin:2px 0;font-family:var(--display);font-weight:800;color:var(--red);
-    font-size:clamp(32px,10vw,44px);line-height:1.02;letter-spacing:-.01em;
+    font-size:clamp(30px,9.2vw,40px);line-height:1.02;letter-spacing:-.01em;
     font-variant-numeric:tabular-nums;
   }
   .cost .big .unit{font-size:.46em;letter-spacing:.01em}
   .cost .tail{font-weight:700;font-size:13px;line-height:1.35;text-wrap:pretty;
-    min-height:2.7em;display:flex;align-items:center;justify-content:center;margin:0}
+    min-height:2.4em;display:flex;align-items:center;justify-content:center;margin:0}
   .cost.swap{animation:pop 520ms var(--ease) both}
   @keyframes pop{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:none}}
 
   /* ── kabarık düğmeler ── */
-  .acts{margin-top:auto;padding-top:10px}
+  .acts{margin-top:auto;padding-top:8px}
   button{font-family:var(--text);cursor:pointer;border:0;background:none;color:inherit}
   .btn{
     width:100%;display:flex;align-items:center;justify-content:center;gap:10px;
@@ -219,6 +230,18 @@
     background:#fff;border:3px solid var(--ink);border-radius:999px;box-shadow:0 3px 0 rgba(23,21,27,.9)}
   .close:active{transform:translateY(3px);box-shadow:none}
 
+  /* haftalık rapor */
+  .week{display:flex;align-items:flex-end;gap:7px;height:132px;padding:12px 12px 0;
+    background:#fff;border:3px solid var(--ink);border-radius:var(--r2);
+    box-shadow:0 3px 0 rgba(23,21,27,.9)}
+  .week .col{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;height:100%}
+  .week .bar2{width:100%;margin-top:auto;border-radius:6px 6px 0 0;border:2px solid var(--ink);
+    border-bottom:0;min-height:4px}
+  .week .d{font-size:10.5px;font-weight:700;opacity:.55;padding-bottom:6px}
+  .week .col.today .d{opacity:1;color:var(--blue)}
+  .weeknote{margin:10px 2px 0;font-size:13px;font-weight:700}
+  .weeknote b{color:var(--red)}
+
   /* istatistik karoları */
   .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
   .tile{background:#fff;border:3px solid var(--ink);border-radius:var(--r2);
@@ -266,6 +289,8 @@
     .app{padding-block:calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-bottom) + 136px)}
     #mascotWrap{width:min(33vw,130px)}
     .metric{padding:9px 12px;margin-top:9px}
+    .bl{margin:8px 0 5px;padding-top:8px}
+    .bl span{font-size:17px}
     .ring{width:48px;height:48px}
     .pct b{font-size:32px}.pct i{font-size:16px}
     .metric .state{font-size:12px;padding:4px 9px}
@@ -290,11 +315,20 @@
     .cost .big{font-size:26px}
     .cost .tail{font-size:11.5px;min-height:2.5em}
     .metric{margin-top:8px;padding:7px 11px}
+    .bl{margin:5px 0 3px;padding-top:5px}
+    .bl span{font-size:14px}.bl em{font-size:10.5px}
+    .bmeter{height:7px}
+    .cost .tail{min-height:2.2em}
+    .metric .state{font-size:11px;padding:3px 8px}
     .ring{width:42px;height:42px}
     .pct b{font-size:28px}.pct i{font-size:14px}
     .bubble{margin-top:8px}
-    .acts{padding-top:8px}
-    .btn{font-size:17px;padding:12px 16px}
+    .acts{padding-top:6px}
+    .btn{font-size:16px;padding:11px 16px}
+    #enter{font-size:13px;padding:6px}
+    .bubble p{font-size:13.5px}
+    .mark{font-size:24px;padding:2px 12px 4px}
+    .chip,.iconbtn{height:36px}.iconbtn{width:36px}
   }
   @media (max-height:640px){
     .metric{display:none}
@@ -351,6 +385,7 @@
   </div>
 
   <div class="card metric">
+    <div class="mrow">
     <div class="ring">
       <svg width="76" height="76" viewBox="0 0 76 76" role="img" aria-labelledby="ringLabel">
         <title id="ringLabel"></title>
@@ -364,6 +399,9 @@
     </div>
     <p class="pct"><b id="hpNum">60</b><i>%</i></p>
     <span class="state" id="state">Yorgun</span>
+    </div>
+    <p class="bl"><span id="budgetTime">0 dk</span><em id="budgetTarget"></em></p>
+    <div class="bmeter"><i id="budgetFill"></i></div>
   </div>
 
   <div class="bubble">
@@ -432,8 +470,13 @@
       <path d="M5 5l10 10M15 5L5 15" stroke="#17151B" stroke-width="2.6" stroke-linecap="round"/>
     </svg>
   </button>
-  <h2 id="hSayilar">Bugün</h2>
+  <h2 id="hSayilar">Bu hafta</h2>
+  <div class="week" id="week" role="img" aria-labelledby="weekLabel">
+    <span class="sr" id="weekLabel"></span>
+  </div>
+  <p class="weeknote" id="weekNote"></p>
 
+  <p class="grouplabel">Bugün</p>
   <div class="tiles">
     <div class="tile">
       <span class="ico" style="background:#D8EFFD" aria-hidden="true">
@@ -484,6 +527,10 @@
     <label for="hours">Günlük ekran saati<small>Ekran Süresi’ndeki gerçek rakam</small></label>
     <input id="hours" type="number" inputmode="decimal" min="0.5" max="16" step="0.5" autocomplete="off" enterkeyhint="done">
   </div>
+  <div class="field">
+    <label for="target">Günlük hedef<small>Instagram’a ayırdığın üst sınır</small></label>
+    <input id="target" type="number" inputmode="decimal" min="0.5" max="12" step="0.5" autocomplete="off" enterkeyhint="done">
+  </div>
 
   <button id="reset">Her şeyi sıfırla</button>
   <p class="note">Sıfırlama beyin sağlığını 60’a döndürür ve tüm sayaçları siler.
@@ -500,6 +547,9 @@
   /* ═══════ AYARLANABİLİR SABİTLER ═══════ */
   var START_HEALTH=60, COST_VISIT=-3, COST_ENTER=-7, GAIN_QUIT=8, GAIN_NEW_DAY=5;
   var REFRESH_MS=60000, LOCK_BASE=10, LOCK_PER_ENTER=5, LOCK_MAX=60;
+  var COOLDOWN_MS=10*60*1000;   /* girişten sonra 10 dk içinde dönersen kilit tam açılır */
+  var MAX_SESSION_MS=4*60*60*1000; /* saçma uzun oturumları sayma (telefon kapalı kalmış olabilir) */
+  var LOG_DAYS=30;
 
   /* ═══════ GELECEK MALİYETİ — yeni madde eklemek için diziye fonksiyon ekle
      c = {age, hours, visits, enters, quits, totalQuits}
@@ -530,7 +580,14 @@
       tail:"Kendi markan için kalan süre. Gün olarak: "+
         Math.round(y*365).toLocaleString("tr-TR")+"."}; },
     function(c){ return {big:c.totalQuits, unit:"vazgeçiş",
-      tail:"Şimdiye kadar geri döndüğün an sayısı. Kanıt burada duruyor."}; }
+      tail:"Şimdiye kadar geri döndüğün an sayısı. Kanıt burada duruyor."}; },
+    /* ölçülen gerçek süreye dayananlar */
+    function(c){ return {big:Math.round(c.weekMs/60000), unit:"dakika",
+      tail:"Bu hafta ölçülen gerçek Instagram süren."}; },
+    function(c){ return {big:(c.weekMs/3600000*52).toFixed(0), unit:"saat / yıl",
+      tail:"Bu haftaki tempo bir yıl sürseydi."}; },
+    function(c){ return {big:Math.round(c.avgSession/60000), unit:"dakika",
+      tail:"Ortalama bir girişin bu kadar sürüyor. Niyetin hep beş dakikaydı."}; }
   ];
 
   var GOREVLER = [
@@ -564,7 +621,10 @@
     health:START_HEALTH, lastTs:0, day:"",
     visits:0, enters:0, quits:0,
     totalQuits:0, totalEnters:0, streak:0, bestStreak:0,
-    age:24, hours:8, bag:[]
+    age:24, hours:8, target:3, bag:[],
+    pendingEnter:0,     /* "Yine de gir"e basılan an */
+    lastEnterTs:0,      /* soğuma için */
+    days:{}             /* "2026-9-17": {v,e,q,ms} */
   };
   var S;
   function load(){
@@ -576,9 +636,42 @@
     S.health=clamp(Number(S.health)||0,0,100);
     S.age=clamp(Number(S.age)||defaults.age,10,79);
     S.hours=clamp(Number(S.hours)||defaults.hours,0.5,16);
+    S.target=clamp(Number(S.target)||defaults.target,0.5,12);
     if(!Array.isArray(S.bag)) S.bag=[];
+    if(!S.days||typeof S.days!=="object") S.days={};
   }
   function save(){ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(e){} }
+
+  function dayKey(d){ d=d||new Date(); return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
+  function dayRec(k){
+    if(!S.days[k]) S.days[k]={v:0,e:0,q:0,ms:0};
+    return S.days[k];
+  }
+  function pruneDays(){
+    var keep={}, d=new Date();
+    for(var i=0;i<LOG_DAYS;i++){ keep[dayKey(d)]=1; d.setDate(d.getDate()-1); }
+    for(var k in S.days) if(!keep[k]) delete S.days[k];
+  }
+  function fmtDur(ms){
+    var m=Math.round(ms/60000);
+    if(m<1) return "0 dk";
+    if(m<60) return m+" dk";
+    var h=Math.floor(m/60), r=m%60;
+    return r ? h+" sa "+r+" dk" : h+" sa";
+  }
+  /* Instagram'da geçen süreyi kapat: "Yine de gir"den sonraki ilk açılışta ölçülür */
+  function closeSession(now){
+    if(!S.pendingEnter) return 0;
+    var ms = now - S.pendingEnter;
+    S.pendingEnter = 0;
+    if(ms <= 0 || ms > MAX_SESSION_MS) return 0;
+    dayRec(dayKey(new Date(now - ms))).ms += ms;
+    return ms;
+  }
+
+  /* Instagram kapandığında otomasyonu bu adresle açar: sayfa geliş saymaz */
+  var CLOSED = /[?&]kapandi=1/.test(location.search);
+  var lastSessionMs = 0;
 
   function registerVisit(){
     var now=Date.now(), d=today();
@@ -590,10 +683,13 @@
       }
       S.day=d; S.visits=0; S.enters=0; S.quits=0;
     }
-    if(now-(S.lastTs||0)>REFRESH_MS){
+    lastSessionMs = closeSession(now);        /* önceki Instagram oturumunu kapat */
+
+    if(!CLOSED && now-(S.lastTs||0)>REFRESH_MS){
       S.visits+=1; S.health=clamp(S.health+COST_VISIT,0,100); S.lastTs=now;
+      dayRec(d).v += 1;
     }
-    save();
+    pruneDays(); save();
   }
 
   /* ═══════ ÇİZİM ALTYAPISI ═══════ */
@@ -716,8 +812,18 @@
   }
 
   /* ═══════ GERÇEK SEÇİMİ ═══════ */
-  function ctx(){ return {age:S.age,hours:S.hours,visits:S.visits,
-    enters:S.enters,quits:S.quits,totalQuits:S.totalQuits}; }
+  function weekStats(){
+    var d=new Date(), ms=0, n=0;
+    for(var i=0;i<7;i++){ var dd=new Date(d); dd.setDate(d.getDate()-i);
+      var r=S.days[dayKey(dd)]; if(r){ ms+=r.ms; n+=r.e; } }
+    return {ms:ms, enters:n};
+  }
+  function ctx(){
+    var w=weekStats();
+    return {age:S.age,hours:S.hours,visits:S.visits,
+      enters:S.enters,quits:S.quits,totalQuits:S.totalQuits,
+      weekMs:w.ms, avgSession:(w.enters?w.ms/w.enters:0)};
+  }
   function refillBag(){
     var idx=GERCEKLER.map(function(_,i){return i;});
     for(var i=idx.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1));
@@ -766,8 +872,37 @@
     el("hpMini").textContent=h+"%";
     el("streakLabel").textContent=S.streak+" günlük seri";
 
-    el("gateLine").innerHTML="Bugün <em>"+S.visits+".</em> gelişin.";
-    el("gateSub").textContent=GATE_SUB[S.visits % GATE_SUB.length];
+    /* kapı mesajı: en sert doğru cümle kazanır */
+    var tMs=dayRec(today()).ms, tgt=S.target*3600000;
+    if(CLOSED && lastSessionMs>0){
+      el("gateLine").innerHTML="Az önce <em>"+fmtDur(lastSessionMs)+"</em> geçti.";
+      el("gateSub").textContent="Bugün toplam "+fmtDur(tMs)+".";
+    } else if(lastSessionMs>0){
+      el("gateLine").innerHTML="Son girişin <em>"+fmtDur(lastSessionMs)+"</em> sürdü.";
+      el("gateSub").textContent="“Beş dakika” değilmiş.";
+    } else if(inCooldown()){
+      var kalan=Math.ceil((COOLDOWN_MS-(Date.now()-S.lastEnterTs))/60000);
+      el("gateLine").innerHTML="<em>"+kalan+" dakika</em> önce çıktın.";
+      el("gateSub").textContent="Bu bir karar değil, refleks. Kilit tam süre.";
+    } else if(tMs>tgt){
+      el("gateLine").innerHTML="Hedefini <em>"+fmtDur(tMs-tgt)+"</em> aştın.";
+      el("gateSub").textContent="Bugünkü bütçe bitti.";
+    } else {
+      el("gateLine").innerHTML="Bugün <em>"+S.visits+".</em> gelişin.";
+      el("gateSub").textContent=GATE_SUB[S.visits % GATE_SUB.length];
+    }
+
+    /* günlük bütçe */
+    var todayMs = dayRec(today()).ms;
+    var targetMs = S.target*3600000;
+    var ratio = Math.min(1.35, todayMs/targetMs);
+    el("budgetTime").textContent = fmtDur(todayMs);
+    el("budgetTarget").textContent = "hedef " + fmtDur(targetMs);
+    el("budgetFill").style.setProperty("--p", Math.min(1,ratio));
+    el("budgetFill").style.background = ratio<0.7 ? "var(--green)" : ratio<1 ? "var(--orange)" : "var(--red)";
+
+
+    drawWeek();
 
     el("dVisits").textContent=S.visits;
     el("dEnters").textContent=S.enters;
@@ -782,6 +917,7 @@
 
     el("age").value=S.age;
     el("hours").value=S.hours;
+    el("target").value=S.target;
 
     if(announce) el("srStatus").textContent=
       "Beyin sağlığı "+h+". Durum: "+st.toLocaleLowerCase("tr")+".";
@@ -789,6 +925,41 @@
     paintMascot(h);
     drawScene(h);
     el("mascotWrap").className = reduced ? "" : (h<35 ? "droop" : "idle");
+  }
+
+  /* ── haftalık rapor ── */
+  var GUN=["Pz","Pt","Sa","Ça","Pe","Cu","Ct"];
+  function drawWeek(){
+    var box=el("week"), lab=el("weekLabel");
+    Array.prototype.slice.call(box.querySelectorAll(".col")).forEach(function(n){ n.remove(); });
+    var d=new Date(), list=[];
+    for(var i=6;i>=0;i--){
+      var dd=new Date(d); dd.setDate(d.getDate()-i);
+      var r=S.days[dayKey(dd)];
+      list.push({g:GUN[dd.getDay()], ms:(r?r.ms:0), today:i===0});
+    }
+    var targetMs=S.target*3600000;
+    var top=Math.max(targetMs, Math.max.apply(null,list.map(function(x){return x.ms;})) || 0, 1);
+    var words=[];
+    list.forEach(function(x){
+      var col=document.createElement("div");
+      col.className="col"+(x.today?" today":"");
+      var bar=document.createElement("div");
+      bar.className="bar2";
+      bar.style.height=Math.max(4, Math.round(x.ms/top*88))+"px";
+      bar.style.background = x.ms===0 ? "rgba(23,21,27,.12)"
+        : x.ms<=targetMs*0.7 ? "var(--green)" : x.ms<=targetMs ? "var(--orange)" : "var(--red)";
+      var lbl=document.createElement("span"); lbl.className="d"; lbl.textContent=x.g;
+      col.appendChild(bar); col.appendChild(lbl); box.appendChild(col);
+      words.push(x.g+" "+fmtDur(x.ms));
+    });
+    lab.textContent="Son yedi gün: "+words.join(", ")+".";
+
+    var total=list.reduce(function(a,x){return a+x.ms;},0);
+    var over=list.filter(function(x){return x.ms>targetMs;}).length;
+    el("weekNote").innerHTML = total===0
+      ? "Henüz ölçülmüş süre yok. İlk “Yine de gir”den sonra dolmaya başlar."
+      : "Bu hafta toplam <b>"+fmtDur(total)+"</b>"+(over?" · "+over+" gün hedefin üstünde":"");
   }
 
   /* ── alttan açılan sayfalar ── */
@@ -822,8 +993,12 @@
 
   /* ── kilit ── */
   var lockTimer=null;
+  function inCooldown(){
+    return S.lastEnterTs > 0 && (Date.now()-S.lastEnterTs) < COOLDOWN_MS;
+  }
   function startLock(){
     var secs=Math.min(LOCK_BASE+LOCK_PER_ENTER*S.enters,LOCK_MAX);
+    if(inCooldown()) secs = LOCK_MAX;        /* az önce girmiştin */
     var btn=el("enter"), cd=el("cd");
     btn.disabled=true; clearInterval(lockTimer);
     cd.textContent=" · "+secs;
@@ -838,13 +1013,17 @@
     if(el("enter").disabled) return;
     S.enters+=1; S.totalEnters+=1;
     S.health=clamp(S.health+COST_ENTER,0,100);
-    S.streak=0; save(); render();
+    S.streak=0;
+    S.pendingEnter=Date.now(); S.lastEnterTs=S.pendingEnter;
+    dayRec(today()).e += 1;
+    save(); render();
     window.location.href=SHORTCUT;
   });
 
   el("quit").addEventListener("click",function(){
     S.quits+=1; S.totalQuits+=1;
     S.health=clamp(S.health+GAIN_QUIT,0,100);
+    dayRec(today()).q += 1;
     save(); render();
     var flash=el("healFlash");
     flash.classList.remove("on"); void flash.offsetWidth; flash.classList.add("on");
@@ -862,6 +1041,10 @@
   el("hours").addEventListener("change",function(){
     S.hours=clamp(parseFloat(this.value)||defaults.hours,0.5,16);
     this.value=S.hours; save(); showFact();
+  });
+  el("target").addEventListener("change",function(){
+    S.target=clamp(parseFloat(this.value)||defaults.target,0.5,12);
+    this.value=S.target; save(); render();
   });
   el("reset").addEventListener("click",function(){
     if(!confirm("Beyin sağlığı ve tüm istatistikler sıfırlanacak. Emin misin?")) return;
