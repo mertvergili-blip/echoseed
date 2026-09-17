@@ -222,24 +222,34 @@ kuruldu. Değerler `:root` içindeki CSS değişkenlerinde tek yerde duruyor.
 gölge), kabarık birincil düğme (basınca aşağı iner), ilerleme halkası
 (içinde mini maskot), konuşma balonu, durum rozeti, alt gezinme çubuğu.
 
-**Sahne:** arka plan çizimi sağlığa göre değişiyor — 55 üstünde mavi gök,
-güneş, bulutlar ve yeşil tepeler; altında gri fırtına, sönük güneş ve
-kurumuş zemin. `drawScene()` bunu SVG olarak üretiyor, dosya dışı görsel yok.
+**Sahne:** arka plan `drawScene()` tarafından SVG olarak üretiliyor ve
+sağlığa göre değişiyor — 55 üstünde mavi gök, güneş, bulutlar, gökdelen
+silüeti, su şeridi ve yeşil tepeler; altında gri fırtına, sönük güneş ve
+kurumuş zemin. Referanstaki arka planlar mockup'ların içine gömülü
+olduğu ve üzerlerindeki arayüzden temiz ayrılamadığı için sahne vektör
+olarak yeniden kuruldu.
 
-## 5.2 Maskot
+## 5.2 Maskot — gerçek çizimler
 
-Tek bir SVG fonksiyonu (`drawMascot`) beş ruh hâli üretiyor: mutlu, meraklı,
-endişeli, bitkin, ağlayan. Sağlık düştükçe kaşlar düşüyor, göz kapakları
-kapanıyor, ağız tersine dönüyor; 35 altında düşük pil işareti, 15 altında
-yağmur bulutu ve gözyaşı çıkıyor.
+Maskot artık kodla çizilmiyor. Anayasanın *03 - Mascot States* sayfasındaki
+orijinal çizimler PDF'ten çıkarıldı, kalın siyah kontur takip edilerek
+karakter zeminden ayrıldı, şeffaf WebP olarak `index.html` içine base64
+gömüldü. Dosya hâlâ tek parça, dış bağımlılık yok.
 
-Gövde birleşen lob elipslerinden kuruluyor (`LOBES`): aynı küme üç kez
-çiziliyor — kalın konturlu koyu katman, mercan dolgu, kırpma maskesi.
-Kollar, bacaklar ve spor ayakkabılar gövdenin arkasına çiziliyor.
-Silüeti değiştirmek için sadece `LOBES` dizisine dokunmak yeterli.
+| Sağlık | Maskot hâli |
+| --- | --- |
+| 78+ | Koşan, kolu havada |
+| 55–77 | Meraklı, düşünen |
+| 35–54 | Endişeli |
+| 15–34 | Bitkin |
+| 15 altı | Ağlayan |
 
-Küçük kopyalar (`drawMini`) halka içinde ve konuşma balonunun yanında
-kullanılıyor; ikisi de aynı sağlık değerini izliyor.
+"Vazgeçtim"e basınca kutlama pozu çıkıyor, 2,6 saniye sonra sağlık hâline
+dönüyor. Halka içindeki ve konuşma balonundaki mini rozetler aynı
+çizimlerin kafa kırpımları.
+
+Yeni bir hâl eklemek için `ART` (tam boy) ve `HEAD` (kafa) nesnelerine
+base64 WebP eklemek, `artFor()` / `headFor()` eşiklerini güncellemek yeterli.
 
 ## 5.3 Erişilebilirlik
 
