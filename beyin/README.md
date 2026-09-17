@@ -32,6 +32,22 @@ Instagram'ı açtığında önce bu sayfa çıkar. Sayfada:
 **Seri (🔥):** Bir günü hiç "Yine de gir" demeden kapatırsan ertesi gün seri bir artar.
 Bir kez girersen sıfırlanır.
 
+**Süre ölçümü:** "Yine de gir"e basılan an kaydediliyor; sayfa bir sonraki
+açılışında aradaki süre o güne Instagram süresi olarak yazılıyor. 4 saatten
+uzun ölçümler sayılmıyor (telefon kapalı kalmış olabilir). Son 30 günün
+kaydı tutuluyor, eskisi siliniyor.
+
+**Günlük hedef:** Ayarlardan girilen üst sınır (varsayılan 3 saat). Ölçüm
+kartının alt satırında bugünkü süre ve hedefe göre renklenen bir şerit var:
+%70'e kadar yeşil, hedefe kadar turuncu, üstünde kırmızı.
+
+**Soğuma (10 dk):** Girişten sonraki 10 dakika içinde geri gelirsen kilit
+doğrudan 60 saniyeye çıkar ve kapı mesajı bunu söyler.
+
+**Kapı mesajı** en sert doğru cümleyi seçer, sırayla: Instagram'dan yeni
+çıktıysan geçen süre → son girişin ne kadar sürdüğü → soğuma uyarısı →
+hedefi ne kadar aştığın → bugün kaçıncı gelişin.
+
 ---
 
 ## 2. Yayınlama
@@ -153,7 +169,28 @@ Aksi halde
 Bitti
 ```
 
-### 3.4 Test
+### 3.4 (İsteğe bağlı) Gerçek süre ölçümü
+
+Uygulama, "Yine de gir"e bastığın anı kaydediyor ve sayfayı bir sonraki
+açışında aradaki süreyi Instagram oturumu olarak yazıyor. Bu ölçüm işe
+yarıyor ama kabaca: Instagram'dan çıkıp başka bir şey yapmaya gidersen,
+süre sen sayfaya dönene kadar işlemeye devam eder.
+
+Tam ölçüm istiyorsan ikinci bir otomasyon kur. Bu otomasyon sayfayı
+`?kapandi=1` ile açar; sayfa bunu görünce **geliş saymaz, sağlık düşürmez**,
+yalnızca süreyi kapatır.
+
+1. **Kısayollar** → **Otomasyon** → **+** → **Uygulama**
+2. **Instagram**'ı seç; bu kez **Açıldığında**'yı kapat, **Kapatıldığında**'yı aç.
+3. **Hemen Çalıştır** açık, **Çalıştırmadan Önce Sor** kapalı olsun.
+4. **Boş Otomasyon Oluştur** → **URL** eylemi ekle, adresinin sonuna
+   `?kapandi=1` ekleyerek yaz: `https://…senin-adresin…/?kapandi=1`
+5. **URL'leri Aç** eylemini ekle. **Bitti**.
+
+Instagram'dan her çıkışında sayfa bir an açılıp "Az önce 12 dk geçti"
+diyecek ve süreyi kaydedecek.
+
+### 3.5 Test
 
 1. Ana ekrandan **Instagram**'a dokun → **Beyin sayfası** açılmalı.
 2. **Yine de gir**'e bas (geri sayım bitince) → Instagram açılmalı.
@@ -179,7 +216,9 @@ Sayfanın altındaki **Ayarlar**'dan:
 
 - **Yaş** — acı gerçeklerin hesabı buradan yapılıyor.
 - **Günlük ortalama ekran saati** — varsayılan 8. Ekran Süresi ekranındaki gerçek rakamı yaz.
-- **Her şeyi sıfırla** — beyin sağlığı ve tüm istatistikler silinir.
+- **Günlük hedef** — varsayılan 3 saat. Instagram'a ayırdığın üst sınır;
+  ölçüm kartındaki şerit ve haftalık grafiğin renkleri buna göre.
+- **Her şeyi sıfırla** — beyin sağlığı, süre kaydı ve tüm istatistikler silinir.
 
 ---
 
@@ -263,8 +302,13 @@ base64 WebP eklemek, `artFor()` / `headFor()` eşiklerini güncellemek yeterli.
 - 320px genişliğe kadar yatay kaydırma yok; "Vazgeçtim" ve "Yine de gir"
   dört cihaz boyutunda da kaydırmadan görünüyor.
 
-## 6. Sonraki sürüm için (v1'de yok)
+## 6. Sonraki sürüm için
 
-- "Kapandığında" otomasyonuyla gerçek süre takibi
-- Seri (streak) sayacı
-- Uygulamalar arası geçişlerde 10 dk bekleme seçeneği
+İlk brifingdeki v2 listesinin üçü de yapıldı: gerçek süre takibi (3.4),
+seri sayacı, 10 dakika soğuma.
+
+Sırada olabilecekler:
+
+- Hedefi tutturunca ödül: yeni maskot pozu ya da tema açılması
+- Haftalık özet bildirimi (Kısayollar'da zamanlanmış otomasyonla)
+- Belirli saatlerde tam engelleme (gece modu)
