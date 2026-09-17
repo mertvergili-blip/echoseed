@@ -207,48 +207,45 @@ düz metin olarak ekleyip çıkarabilirsin.
 
 ## 5.1 Ekranlar
 
-Alttaki çubukta üç sekme var, hepsi aynı sayfanın içinde:
+Tek ekran. Beyin, sağlık sayısı, ölçek, bir acı gerçek, iki eylem.
+Altta iki sessiz bağlantı var; ikisi de alttan açılan bir sayfa açıyor:
 
-- **Beyin** — karakter, sağlık yüzdesi, bugünün üç sayacı, acı gerçek ve iki düğme.
-- **Sayılar** — bugünün ve toplamın dökümü, seri dahil.
+- **Sayılar** — bugünün ve tüm zamanların dökümü, en uzun seri dahil.
 - **Ayarlar** — yaş, günlük ekran saati, sıfırlama.
+
+Sayfalar Escape ile, perdeye dokunarak veya kapat düğmesiyle kapanıyor;
+odak açılışta içeri alınıp kapanışta açan düğmeye geri dönüyor.
 
 ## 5.2 Görsel dil
 
-Düz vektör çizgi film: kalın siyah kontur, gradyan yok, çıkartma gibi
-konturlu rakamlar. Sayfa kartlara bölünmüyor — üstte açık gökyüzü, altında
-kavisli tek bir zemin var, içerik zeminin üstünde duruyor. Renkler `:root`
-içindeki CSS değişkenlerinde tek yerde duruyor (`--sky`, `--hill`, `--tile`,
-`--green`, `--crimson`, `--outline`). Ufuk çizgisinin yüksekliği `--hillTop`
-değişkeninde; Beyin sekmesinde aşağıda, diğer sekmelerde yukarıda duruyor. Beynin gövde renkleri `C_FRESH` / `C_MID` /
-`C_DEAD` sabitlerinden geliyor; `bodyRGB()` bu üçü arasında geçiş yapıyor.
+Sıcak is siyahı zemin (`--ground #14100D`) üstünde kemik rengi mürekkep
+(`--bone #E9E1D0`). Bu, ilk brifingdeki paletin tersine çevrilmişi: aynı
+renkler, rolleri değişmiş. Tek vurgu kırmızı (`--crimson #C8303A`), sadece
+sayılar ve ölçek için.
 
-Beyin karakteri tek bir path değil, birleşen lob elipslerinden kuruluyor
-(`LOBES`). Aynı elips kümesi üç kez çiziliyor: kalın konturlu koyu katman,
-gövde renginde dolgu, bir de kırpma maskesi. Silüeti değiştirmek için
-sadece `LOBES` dizisine dokunman yeterli.
+Tipografi iki aile: rakamlar ve başlıklar **Big Shoulders Display**,
+arayüz metni **Archivo**. Rakamlar sayfanın en yüksek sesi.
 
-Puanları değiştirmek istersen dosyanın başındaki
-`START_HEALTH`, `COST_VISIT`, `COST_ENTER`, `GAIN_QUIT`, `GAIN_NEW_DAY`,
-`LOCK_BASE`, `LOCK_PER_ENTER`, `LOCK_MAX` sabitleri tek yerde duruyor.
+Beyin sıcak bir ışık havuzunun içinde duruyor — sayfadaki tek cesur öğe o.
+Karakter birleşen lob elipslerinden kuruluyor (`LOBES`); aynı küme üç kez
+çiziliyor: kalın konturlu koyu katman, gövde renginde dolgu, kırpma maskesi.
+Silüeti değiştirmek için sadece `LOBES` dizisine dokunmak yeterli.
 
----
+Arayüzde hiç emoji yok; ikonların hepsi elde çizilmiş SVG.
 
 ## 5.3 Erişilebilirlik
 
-Sayfa, Vercel'in Web Interface Guidelines kurallarına göre denetlendi
-(`npx skills add vercel-labs/agent-skills@web-design-guidelines`). Uyulanlar:
-
-- Yakınlaştırma serbest — `maximum-scale` yok.
-- Her etkileşimli öğede görünür klavye odağı (`:focus-visible`).
-- Emojiler dekoratif sayılıyor (`aria-hidden`), sayılar ayrı etiketli.
-- Beyin ve sağlık göstergesi `role="img"` + başlıkla adlandırılmış.
+- Yakınlaştırma serbest, `maximum-scale` yok.
+- Her etkileşimli öğede `:focus-visible` odak halkası; hiçbir yerde
+  `outline:none` yok.
+- Alttan açılan sayfalar `role="dialog"` + `aria-modal`, odak yönetimli,
+  `overscroll-behavior: contain`.
 - Sağlık değişimi `aria-live` bölgesinden duyuruluyor, ilk açılışta susuyor.
-- Sekme çubuğunda `aria-current`, `<nav>` etiketli.
-- Sayılar listesi gerçek `<ul>/<li>`, tıklanamayan `<a>` yok.
-- Sağlık barı `width` yerine `transform` ile canlanıyor.
-- Rakamlar `tabular-nums` ile hizalı, başlıklarda `text-wrap: balance`.
-- `color-scheme: light` ve `touch-action: manipulation`.
+- Ölçek görsel değil metinsel de etiketli.
+- Rakamlar `tabular-nums`, başlıklarda `text-wrap: balance`.
+- `color-scheme: dark`, `touch-action: manipulation`, safe-area desteği.
+- 320px genişliğe kadar yatay kaydırma yok; "Vazgeçtim" her ekranda
+  kaydırmadan görünüyor.
 
 ## 6. Sonraki sürüm için (v1'de yok)
 
