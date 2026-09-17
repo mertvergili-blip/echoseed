@@ -87,10 +87,7 @@
   #hpsvg{display:block;width:100%;max-width:200px;margin:-6px auto 0}
   #hpsvg text{font-family:var(--num);font-weight:800}
   .tagline{text-align:center;margin-top:-2px}
-  #tag{
-    font-weight:700;font-size:11.5px;letter-spacing:.13em;text-transform:uppercase;
-    color:var(--muted-hill);
-  }
+  #tag{font-weight:700;font-size:17px;color:var(--muted-hill)}
   .bar{
     height:14px;border-radius:999px;background:rgba(255,255,255,.6);
     margin:9px 4px 0;overflow:hidden;
@@ -222,7 +219,7 @@
     .acts{gap:7px;margin-top:10px}
     button{padding:12px 16px;font-size:15.5px;border-radius:18px}
     #enter{font-size:13.5px}
-    #tag{font-size:10.5px}
+    #tag{font-size:15px}
   }
 
   [hidden]{display:none!important}
@@ -315,6 +312,8 @@
       <li><span class="ico" aria-hidden="true">📉</span><span class="nm"><b>Giriş</b><span>Şimdiye kadar</span></span><span class="val" id="tEnters">0</span></li>
       <li><span class="ico" aria-hidden="true">🔥</span><span class="nm"><b>Seri</b><span>Hiç girmeden kapatılan gün</span></span><span class="val" id="tStreak">0</span></li>
     </ul>
+    <p class="hint" id="emptyNote" hidden>Henüz geçmiş yok. İlk “Vazgeçtim”den sonra
+      burası dolmaya başlar.</p>
   </section>
 
   <!-- ============ AYARLAR ============ -->
@@ -558,11 +557,11 @@
     return mix(C_DEAD, C_MID, Math.pow(h / 45, 1.15));
   }
   function tagFor(h){
-    if (h >= 78) return "TAZE";
-    if (h >= 55) return "YORGUN";
-    if (h >= 35) return "BULANIK";
-    if (h >= 15) return "ÇÜRÜYOR";
-    return "ZOMBİ";
+    if (h >= 78) return "Taze";
+    if (h >= 55) return "Yorgun";
+    if (h >= 35) return "Bulanık";
+    if (h >= 15) return "Çürüyor";
+    return "Zombi";
   }
   function barColor(h){
     return h >= 60 ? "var(--green)" : h >= 30 ? "var(--amber)" : "var(--red)";
@@ -769,10 +768,10 @@
     el("bar").style.background = barColor(h);
     el("streakNum").textContent = S.streak;
 
-    el("hpLabel").textContent = "Beyin sağlığı: yüzde " + h + ", " + tagFor(h).toLowerCase();
+    el("hpLabel").textContent = "Beyin sağlığı: yüzde " + h + ", " + tagFor(h).toLocaleLowerCase("tr");
     el("streakLabel").textContent = S.streak + " günlük seri";
     if (announce) el("srStatus").textContent =
-      "Beyin sağlığı yüzde " + h + ". Durum: " + tagFor(h).toLowerCase() + ".";
+      "Beyin sağlığı yüzde " + h + ". Durum: " + tagFor(h).toLocaleLowerCase("tr") + ".";
 
     el("sVisits").textContent = el("dVisits").textContent = S.visits;
     el("sEnters").textContent = el("dEnters").textContent = S.enters;
@@ -781,6 +780,7 @@
     el("tEnters").textContent = S.totalEnters;
     el("tStreak").textContent = S.streak;
 
+    el("emptyNote").hidden = !(S.totalQuits === 0 && S.totalEnters === 0);
     el("age").value = S.age;
     el("hours").value = S.hours;
     drawBrain(h);
