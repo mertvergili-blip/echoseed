@@ -205,47 +205,53 @@ hepsi bir kez çıkmadan aynısı tekrar etmez.
 Küçük görevleri de aynı dosyadaki **`GOREVLER`** dizisinden
 düz metin olarak ekleyip çıkarabilirsin.
 
-## 5.1 Ekranlar
+## 5.1 Tasarım sistemi — MINDO
 
-Tek ekran. Beyin, sağlık sayısı, ölçek, bir acı gerçek, iki eylem.
-Altta iki sessiz bağlantı var; ikisi de alttan açılan bir sayfa açıyor:
+Arayüz, `MINDO Claude Visual Reference Pack`teki 14 ekranlık anayasaya göre
+kuruldu. Değerler `:root` içindeki CSS değişkenlerinde tek yerde duruyor.
 
-- **Sayılar** — bugünün ve tüm zamanların dökümü, en uzun seri dahil.
-- **Ayarlar** — yaş, günlük ekran saati, sıfırlama.
+**Renkler:** `--sky #84D8F5` · `--coral #FF8F82` · `--cream #FFF3DF` ·
+`--ink #17151B` · `--green #31C86A` · `--orange #FF7A38` · `--red #FF5A55` ·
+`--blue #2B9BF4`
 
-Sayfalar Escape ile, perdeye dokunarak veya kapat düğmesiyle kapanıyor;
-odak açılışta içeri alınıp kapanışta açan düğmeye geri dönüyor.
+**Tipografi:** Başlıklar ve rakamlar **Baloo 2** (800), gövde metni **Nunito**.
 
-## 5.2 Görsel dil
+**Ritim:** 8px (`--s1`…`--s6`). **Köşe yarıçapı:** 8 / 16 / 24 (`--r1`…`--r3`).
 
-Sıcak is siyahı zemin (`--ground #14100D`) üstünde kemik rengi mürekkep
-(`--bone #E9E1D0`). Bu, ilk brifingdeki paletin tersine çevrilmişi: aynı
-renkler, rolleri değişmiş. Tek vurgu kırmızı (`--crimson #C8303A`), sadece
-sayılar ve ölçek için.
+**Bileşenler:** çıkartma kelime işareti, krem kart (4px kontur + sert alt
+gölge), kabarık birincil düğme (basınca aşağı iner), ilerleme halkası
+(içinde mini maskot), konuşma balonu, durum rozeti, alt gezinme çubuğu.
 
-Tipografi iki aile: rakamlar ve başlıklar **Big Shoulders Display**,
-arayüz metni **Archivo**. Rakamlar sayfanın en yüksek sesi.
+**Sahne:** arka plan çizimi sağlığa göre değişiyor — 55 üstünde mavi gök,
+güneş, bulutlar ve yeşil tepeler; altında gri fırtına, sönük güneş ve
+kurumuş zemin. `drawScene()` bunu SVG olarak üretiyor, dosya dışı görsel yok.
 
-Beyin sıcak bir ışık havuzunun içinde duruyor — sayfadaki tek cesur öğe o.
-Karakter birleşen lob elipslerinden kuruluyor (`LOBES`); aynı küme üç kez
-çiziliyor: kalın konturlu koyu katman, gövde renginde dolgu, kırpma maskesi.
+## 5.2 Maskot
+
+Tek bir SVG fonksiyonu (`drawMascot`) beş ruh hâli üretiyor: mutlu, meraklı,
+endişeli, bitkin, ağlayan. Sağlık düştükçe kaşlar düşüyor, göz kapakları
+kapanıyor, ağız tersine dönüyor; 35 altında düşük pil işareti, 15 altında
+yağmur bulutu ve gözyaşı çıkıyor.
+
+Gövde birleşen lob elipslerinden kuruluyor (`LOBES`): aynı küme üç kez
+çiziliyor — kalın konturlu koyu katman, mercan dolgu, kırpma maskesi.
+Kollar, bacaklar ve spor ayakkabılar gövdenin arkasına çiziliyor.
 Silüeti değiştirmek için sadece `LOBES` dizisine dokunmak yeterli.
 
-Arayüzde hiç emoji yok; ikonların hepsi elde çizilmiş SVG.
+Küçük kopyalar (`drawMini`) halka içinde ve konuşma balonunun yanında
+kullanılıyor; ikisi de aynı sağlık değerini izliyor.
 
 ## 5.3 Erişilebilirlik
 
 - Yakınlaştırma serbest, `maximum-scale` yok.
-- Her etkileşimli öğede `:focus-visible` odak halkası; hiçbir yerde
-  `outline:none` yok.
+- Her etkileşimli öğede `:focus-visible` odak halkası.
+- Arayüzde hiç emoji yok; tüm ikonlar çizilmiş SVG.
 - Alttan açılan sayfalar `role="dialog"` + `aria-modal`, odak yönetimli,
-  `overscroll-behavior: contain`.
+  Escape ve perdeyle kapanıyor, `overscroll-behavior: contain`.
 - Sağlık değişimi `aria-live` bölgesinden duyuruluyor, ilk açılışta susuyor.
-- Ölçek görsel değil metinsel de etiketli.
-- Rakamlar `tabular-nums`, başlıklarda `text-wrap: balance`.
-- `color-scheme: dark`, `touch-action: manipulation`, safe-area desteği.
-- 320px genişliğe kadar yatay kaydırma yok; "Vazgeçtim" her ekranda
-  kaydırmadan görünüyor.
+- Rakamlar `tabular-nums`.
+- 320px genişliğe kadar yatay kaydırma yok; "Vazgeçtim" ve "Yine de gir"
+  dört cihaz boyutunda da kaydırmadan görünüyor.
 
 ## 6. Sonraki sürüm için (v1'de yok)
 
