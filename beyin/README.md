@@ -44,9 +44,13 @@ kartının alt satırında bugünkü süre ve hedefe göre renklenen bir şerit 
 **Soğuma (10 dk):** Girişten sonraki 10 dakika içinde geri gelirsen kilit
 doğrudan 60 saniyeye çıkar ve kapı mesajı bunu söyler.
 
-**Kapı mesajı** en sert doğru cümleyi seçer, sırayla: Instagram'dan yeni
-çıktıysan geçen süre → son girişin ne kadar sürdüğü → soğuma uyarısı →
-hedefi ne kadar aştığın → bugün kaçıncı gelişin.
+**Gece modu (22:00–06:00):** Arka plan yatak odasına, maskot meditasyon
+pozuna geçer; kapı saati söyler: "Saat 01:47. Uyku, yarının en ucuz
+yatırımı."
+
+**Kapı mesajı** en sert doğru cümleyi seçer, sırayla: gece saati →
+Instagram'dan yeni çıktıysan geçen süre → son girişin ne kadar sürdüğü →
+soğuma uyarısı → hedefi ne kadar aştığın → bugün kaçıncı gelişin.
 
 ---
 
@@ -261,12 +265,24 @@ kuruldu. Değerler `:root` içindeki CSS değişkenlerinde tek yerde duruyor.
 gölge), kabarık birincil düğme (basınca aşağı iner), ilerleme halkası
 (içinde mini maskot), konuşma balonu, durum rozeti, alt gezinme çubuğu.
 
-**Sahne:** arka plan `drawScene()` tarafından SVG olarak üretiliyor ve
-sağlığa göre değişiyor — 55 üstünde mavi gök, güneş, bulutlar, gökdelen
-silüeti, su şeridi ve yeşil tepeler; altında gri fırtına, sönük güneş ve
-kurumuş zemin. Referanstaki arka planlar mockup'ların içine gömülü
-olduğu ve üzerlerindeki arayüzden temiz ayrılamadığı için sahne vektör
-olarak yeniden kuruldu.
+**Sahne:** `img/` altındaki beş çizim arasından seçiliyor. Sıra en
+sertten en yumuşağa:
+
+| Koşul | Görsel |
+| --- | --- |
+| Saat 22:00–06:00 | `gece.webp` — yatak odası, maskot meditasyonda |
+| Günlük hedef aşıldı | `kumsaati.webp` — kum saati |
+| Sağlık 35 altı | `harabe.webp` — kırık ekran çölü |
+| Sağlık 55 altı | `gecis.webp` — yarısı çiçek, yarısı kurumuş |
+| Diğer | `bahce.webp` — güneşli bahçe |
+
+Görseller ayrı dosya, gömülü değil: tek dosyada 700 KB'ı bulup açılışı
+yavaşlatıyorlardı. Altlarında `drawScene()` ile üretilen vektör sahne
+duruyor; görsel yüklenemezse (çevrimdışı, eksik klasör) arayüz eksiksiz
+çalışmaya devam ediyor.
+
+**Yayınlarken `img/` klasörünü de yükle.** Netlify Drop'a `beyin`
+klasörünün tamamını sürüklersen sorun olmaz.
 
 ## 5.2 Maskot — gerçek çizimler
 
@@ -282,6 +298,7 @@ gömüldü. Dosya hâlâ tek parça, dış bağımlılık yok.
 | 35–54 | Endişeli |
 | 15–34 | Bitkin |
 | 15 altı | Ağlayan |
+| Gece (22:00–06:00) | Meditasyon, sağlıktan bağımsız |
 
 "Vazgeçtim"e basınca kutlama pozu çıkıyor, 2,6 saniye sonra sağlık hâline
 dönüyor. Halka içindeki ve konuşma balonundaki mini rozetler aynı
