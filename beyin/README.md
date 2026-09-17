@@ -234,6 +234,22 @@ Puanları değiştirmek istersen dosyanın başındaki
 
 ---
 
+## 5.3 Erişilebilirlik
+
+Sayfa, Vercel'in Web Interface Guidelines kurallarına göre denetlendi
+(`npx skills add vercel-labs/agent-skills@web-design-guidelines`). Uyulanlar:
+
+- Yakınlaştırma serbest — `maximum-scale` yok.
+- Her etkileşimli öğede görünür klavye odağı (`:focus-visible`).
+- Emojiler dekoratif sayılıyor (`aria-hidden`), sayılar ayrı etiketli.
+- Beyin ve sağlık göstergesi `role="img"` + başlıkla adlandırılmış.
+- Sağlık değişimi `aria-live` bölgesinden duyuruluyor, ilk açılışta susuyor.
+- Sekme çubuğunda `aria-current`, `<nav>` etiketli.
+- Sayılar listesi gerçek `<ul>/<li>`, tıklanamayan `<a>` yok.
+- Sağlık barı `width` yerine `transform` ile canlanıyor.
+- Rakamlar `tabular-nums` ile hizalı, başlıklarda `text-wrap: balance`.
+- `color-scheme: light` ve `touch-action: manipulation`.
+
 ## 6. Sonraki sürüm için (v1'de yok)
 
 - "Kapandığında" otomasyonuyla gerçek süre takibi

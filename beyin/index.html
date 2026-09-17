@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#F1F0F3">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -25,7 +25,16 @@
     --hillTop:222px;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{margin:0;padding:0}
+  html{color-scheme:light}
+  html,body{margin:0;padding:0;touch-action:manipulation}
+
+  /* klavye odağı her yerde görünür olsun */
+  :focus-visible{outline:3px solid var(--outline);outline-offset:3px;border-radius:8px}
+  nav button:focus-visible{outline-offset:-2px}
+
+  /* ekran okuyucuya özel, gözle görünmez */
+  .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+    clip:rect(0 0 0 0);white-space:nowrap;border:0}
   body{
     font-family:var(--ui);background:var(--sky);color:var(--ink);
     font-size:16px;line-height:1.4;-webkit-font-smoothing:antialiased;
@@ -65,7 +74,7 @@
   @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
   .drip{animation:drip 2.2s linear infinite}
   @keyframes drip{0%{opacity:0;transform:translateY(0)}14%{opacity:1}100%{opacity:0;transform:translateY(44px)}}
-  .fly{animation:orbit 3.4s linear infinite;transform-origin:150px 128px}
+  .fly{animation:orbit 3.4s linear infinite;transform-box:view-box;transform-origin:150px 128px}
   @keyframes orbit{from{transform:rotate(0)}to{transform:rotate(360deg)}}
   #healFlash{
     position:absolute;inset:-8%;border-radius:50%;
@@ -86,18 +95,24 @@
     height:14px;border-radius:999px;background:rgba(255,255,255,.6);
     margin:9px 4px 0;overflow:hidden;
   }
-  .bar i{display:block;height:100%;border-radius:999px;background:var(--green);
-    transition:width .7s cubic-bezier(.2,.8,.2,1),background .5s}
+  .bar i{
+    display:block;width:100%;height:100%;border-radius:999px;background:var(--green);
+    transform:translateX(calc((var(--p,0) - 100) * 1%));
+    transition:transform .7s cubic-bezier(.2,.8,.2,1),background .5s;
+  }
 
   /* ---------- karolar ---------- */
   .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
   .tiles div{background:var(--tile);border-radius:20px;padding:11px 5px 10px;text-align:center}
   .tiles i{display:block;font-style:normal;font-size:20px;line-height:1;margin-bottom:6px}
-  .tiles b{display:block;font-family:var(--num);font-weight:800;font-size:22px;line-height:1}
+  .tiles b{display:block;font-family:var(--num);font-weight:800;font-size:22px;line-height:1;
+    font-variant-numeric:tabular-nums}
   .tiles span{display:block;margin-top:3px;font-size:10.5px;font-weight:500;color:var(--muted-hill)}
 
   /* ---------- bölüm başlığı ---------- */
-  h2{margin:16px 2px 8px;font-size:16px;font-weight:700;letter-spacing:-.01em}
+  h1.wordmark{margin:0}
+  h2{margin:16px 2px 8px;font-size:16px;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
+  .fact p,.task p{text-wrap:pretty}
 
   /* ---------- acı gerçek ---------- */
   .fact{background:var(--tile-2);border-radius:24px;padding:16px 16px 18px;text-align:center}
@@ -124,7 +139,7 @@
   #enter{background:transparent;color:var(--muted-hill);box-shadow:inset 0 0 0 2px rgba(50,38,66,.2);
     font-size:15px;font-weight:600}
   #enter[disabled]{opacity:.65;cursor:not-allowed}
-  #enter .cd{color:var(--crimson);font-weight:800;font-family:var(--num)}
+  #enter .cd{color:var(--crimson);font-weight:800;font-family:var(--num);font-variant-numeric:tabular-nums}
 
   /* ---------- görev ---------- */
   .task{margin-top:12px;border-radius:22px;padding:17px 18px;display:none;background:#D7F0E0}
@@ -135,11 +150,12 @@
 
   /* ---------- liste (Sayılar) ---------- */
   .list{background:var(--tile-2);border-radius:24px;overflow:hidden}
-  .list a{
+  .list{list-style:none;margin:0;padding:0}
+  .list li{
     display:flex;align-items:center;gap:13px;padding:14px 16px;
-    border-bottom:1px solid rgba(50,38,66,.08);text-decoration:none;color:inherit;
+    border-bottom:1px solid rgba(50,38,66,.08);
   }
-  .list a:last-child{border-bottom:0}
+  .list li:last-child{border-bottom:0}
   .list .ico{
     width:38px;height:38px;border-radius:12px;background:rgba(255,255,255,.55);
     display:grid;place-items:center;font-size:19px;flex:none;
@@ -147,7 +163,7 @@
   .list .nm{flex:1;min-width:0}
   .list .nm b{display:block;font-size:15px;font-weight:600}
   .list .nm span{display:block;font-size:12px;color:var(--muted-hill)}
-  .list .val{font-family:var(--num);font-weight:800;font-size:19px}
+  .list .val{font-family:var(--num);font-weight:800;font-size:19px;font-variant-numeric:tabular-nums}
 
   /* ---------- ayarlar ---------- */
   .panel{background:var(--tile-2);border-radius:24px;padding:6px 18px 18px}
@@ -221,8 +237,8 @@
 
   <header>
     <div class="spacer"></div>
-    <div class="wordmark">BEYİN</div>
-    <div class="streak"><span>🔥</span><em id="streakNum">0</em></div>
+    <h1 class="wordmark" translate="no">BEYİN</h1>
+    <div class="streak"><span aria-hidden="true">🔥</span><em id="streakNum">0</em><span class="sr" id="streakLabel"></span></div>
   </header>
 
   <!-- ============ BEYİN ============ -->
@@ -247,7 +263,8 @@
       </div>
     </div>
 
-    <svg id="hpsvg" viewBox="0 0 236 92" aria-label="Beyin sağlığı">
+    <svg id="hpsvg" viewBox="0 0 236 92" role="img" aria-labelledby="hpLabel">
+      <title id="hpLabel">Beyin sağlığı</title>
       <text x="118" y="72" text-anchor="middle" font-size="72"
             fill="#191320" stroke="#191320" stroke-width="12"
             stroke-linejoin="round" paint-order="stroke" transform="translate(0,7)"
@@ -258,12 +275,12 @@
       ><tspan id="hpNum">60</tspan><tspan font-size="33">%</tspan></text>
     </svg>
     <div class="tagline"><span id="tag">TAZE</span></div>
-    <div class="bar"><i id="bar" style="width:60%"></i></div>
+    <div class="bar"><i id="bar" style="--p:60"></i></div>
 
     <div class="tiles">
-      <div><i>👀</i><b id="sVisits">0</b><span>Geliş</span></div>
-      <div><i>📲</i><b id="sEnters">0</b><span>Giriş</span></div>
-      <div><i>✋</i><b id="sQuits">0</b><span>Vazgeçiş</span></div>
+      <div><i aria-hidden="true">👀</i><b id="sVisits">0</b><span>Geliş</span></div>
+      <div><i aria-hidden="true">📲</i><b id="sEnters">0</b><span>Giriş</span></div>
+      <div><i aria-hidden="true">✋</i><b id="sQuits">0</b><span>Vazgeçiş</span></div>
     </div>
 
     <h2>Acı gerçek</h2>
@@ -277,7 +294,7 @@
       <button id="enter" disabled>Yine de gir <span class="cd" id="cd"></span></button>
     </div>
 
-    <div class="task" id="task">
+    <div class="task" id="task" aria-live="polite">
       <h3>Telefon yerine</h3>
       <p id="taskText"></p>
     </div>
@@ -286,38 +303,40 @@
   <!-- ============ SAYILAR ============ -->
   <section id="viewSayilar" hidden>
     <h2>Bugün</h2>
-    <div class="list">
-      <a><span class="ico">👀</span><span class="nm"><b>Geliş</b><span>Sayfayı kaç kez gördün</span></span><span class="val" id="dVisits">0</span></a>
-      <a><span class="ico">📲</span><span class="nm"><b>Giriş</b><span>Yine de girdiğin an</span></span><span class="val" id="dEnters">0</span></a>
-      <a><span class="ico">✋</span><span class="nm"><b>Vazgeçiş</b><span>Geri döndüğün an</span></span><span class="val" id="dQuits">0</span></a>
-    </div>
+    <ul class="list">
+      <li><span class="ico" aria-hidden="true">👀</span><span class="nm"><b>Geliş</b><span>Sayfayı kaç kez gördün</span></span><span class="val" id="dVisits">0</span></li>
+      <li><span class="ico" aria-hidden="true">📲</span><span class="nm"><b>Giriş</b><span>Yine de girdiğin an</span></span><span class="val" id="dEnters">0</span></li>
+      <li><span class="ico" aria-hidden="true">✋</span><span class="nm"><b>Vazgeçiş</b><span>Geri döndüğün an</span></span><span class="val" id="dQuits">0</span></li>
+    </ul>
 
     <h2>Toplam</h2>
-    <div class="list">
-      <a><span class="ico">🏆</span><span class="nm"><b>Vazgeçiş</b><span>Şimdiye kadar</span></span><span class="val" id="tQuits">0</span></a>
-      <a><span class="ico">📉</span><span class="nm"><b>Giriş</b><span>Şimdiye kadar</span></span><span class="val" id="tEnters">0</span></a>
-      <a><span class="ico">🔥</span><span class="nm"><b>Seri</b><span>Hiç girmeden kapatılan gün</span></span><span class="val" id="tStreak">0</span></a>
-    </div>
+    <ul class="list">
+      <li><span class="ico" aria-hidden="true">🏆</span><span class="nm"><b>Vazgeçiş</b><span>Şimdiye kadar</span></span><span class="val" id="tQuits">0</span></li>
+      <li><span class="ico" aria-hidden="true">📉</span><span class="nm"><b>Giriş</b><span>Şimdiye kadar</span></span><span class="val" id="tEnters">0</span></li>
+      <li><span class="ico" aria-hidden="true">🔥</span><span class="nm"><b>Seri</b><span>Hiç girmeden kapatılan gün</span></span><span class="val" id="tStreak">0</span></li>
+    </ul>
   </section>
 
   <!-- ============ AYARLAR ============ -->
   <section id="viewAyarlar" hidden>
     <h2>Ayarlar</h2>
     <div class="panel">
-      <div class="row"><label for="age">Yaş</label><input id="age" type="number" inputmode="numeric" min="10" max="79" step="1"></div>
-      <div class="row"><label for="hours">Günlük ekran saati</label><input id="hours" type="number" inputmode="decimal" min="0.5" max="16" step="0.5"></div>
+      <div class="row"><label for="age">Yaş</label><input id="age" type="number" inputmode="numeric" min="10" max="79" step="1" autocomplete="off" enterkeyhint="done"></div>
+      <div class="row"><label for="hours">Günlük ekran saati</label><input id="hours" type="number" inputmode="decimal" min="0.5" max="16" step="0.5" autocomplete="off" enterkeyhint="done"></div>
       <button id="reset">Her şeyi sıfırla</button>
     </div>
     <p class="hint">Acı gerçeklerdeki rakamlar bu iki ayardan hesaplanıyor.
       Ekran saatini iPhone’daki Ekran Süresi ekranından bakıp yaz.</p>
   </section>
+
+  <p class="sr" id="srStatus" role="status" aria-live="polite"></p>
 </div>
 
-<nav>
+<nav aria-label="Bölümler">
   <div class="bar2">
-    <button class="on" data-view="Beyin"><i>🧠</i>Beyin</button>
-    <button data-view="Sayilar"><i>📊</i>Sayılar</button>
-    <button data-view="Ayarlar"><i>⚙️</i>Ayarlar</button>
+    <button class="on" data-view="Beyin"><i aria-hidden="true">🧠</i>Beyin</button>
+    <button data-view="Sayilar"><i aria-hidden="true">📊</i>Sayılar</button>
+    <button data-view="Ayarlar"><i aria-hidden="true">⚙️</i>Ayarlar</button>
   </div>
 </nav>
 
@@ -740,14 +759,20 @@
   /* ============================================================
      ARAYÜZ
      ============================================================ */
+  var announce = false;            // ilk çizimde ekran okuyucuyu boşuna konuşturma
   function render(){
     var h = Math.round(S.health);
     el("hpNum").textContent = h;
     el("hpBack").textContent = h;
     el("tag").textContent = tagFor(h);
-    el("bar").style.width = h + "%";
+    el("bar").style.setProperty("--p", h);
     el("bar").style.background = barColor(h);
     el("streakNum").textContent = S.streak;
+
+    el("hpLabel").textContent = "Beyin sağlığı: yüzde " + h + ", " + tagFor(h).toLowerCase();
+    el("streakLabel").textContent = S.streak + " günlük seri";
+    if (announce) el("srStatus").textContent =
+      "Beyin sağlığı yüzde " + h + ". Durum: " + tagFor(h).toLowerCase() + ".";
 
     el("sVisits").textContent = el("dVisits").textContent = S.visits;
     el("sEnters").textContent = el("dEnters").textContent = S.enters;
@@ -766,10 +791,12 @@
   function showView(name){
     VIEWS.forEach(function(v){ el("view" + v).hidden = (v !== name); });
     Array.prototype.forEach.call(document.querySelectorAll("nav button"), function(b){
-      b.classList.toggle("on", b.getAttribute("data-view") === name);
+      var on = b.getAttribute("data-view") === name;
+      b.classList.toggle("on", on);
+      if (on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
     });
     el("app").classList.toggle("home", name === "Beyin");
-    window.scrollTo(0, 0);
+    if (announce) window.scrollTo(0, 0);
   }
   Array.prototype.forEach.call(document.querySelectorAll("nav button"), function(b){
     b.addEventListener("click", function(){ showView(b.getAttribute("data-view")); });
@@ -829,6 +856,8 @@
   load();
   registerVisit();
   render();
+  showView("Beyin");        // aria-current başlangıçta da doğru olsun
+  announce = true;
   showFact();
   startLock();
 })();
