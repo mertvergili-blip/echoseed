@@ -282,7 +282,9 @@ duruyor; görsel yüklenemezse (çevrimdışı, eksik klasör) arayüz eksiksiz
 çalışmaya devam ediyor.
 
 **Yayınlarken `img/` klasörünü de yükle.** Netlify Drop'a `beyin`
-klasörünün tamamını sürüklersen sorun olmaz.
+klasörünün tamamını sürüklersen sorun olmaz — klasörde yayına çıkması
+gereken her şey var ve toplam 800 KB. (Tasarım referansı PDF'i yayın
+dışında, repo kökündeki `docs/` klasöründe duruyor.)
 
 ## 5.2 Maskot — gerçek çizimler
 
